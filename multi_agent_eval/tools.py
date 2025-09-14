@@ -1,0 +1,173 @@
+import asyncio
+from typing import Optional
+
+from inspect_ai.tool import Tool, tool, ToolError
+from inspect_ai.util import sandbox
+
+
+def create_file_reader_tool(agent_id: str) -> Tool:
+    """Create a file reading tool for an agent that can read all files."""
+
+    @tool
+    def read_file():
+        async def execute(file_path: str) -> str:
+            """
+            Read the contents of a Python file.
+
+            Args:
+                file_path: Path to the file to read (relative to repo root)
+
+            Returns:
+                The contents of the file
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError("Sandbox environment not available")
+
+                # Ensure the file path is within the repo
+                if file_path.startswith('/') or '..' in file_path:
+                    raise ToolError("Invalid file path. Use relative paths within the repo.")
+
+                contents = await sandbox_env.read_file(f"/workspace/{file_path}")
+                return f"[Agent {agent_id}] Successfully read {file_path}:\n{contents}"
+
+            except FileNotFoundError:
+                raise ToolError(f"File {file_path} not found")
+            except Exception as e:
+                raise ToolError(f"Error reading file: {str(e)}")
+
+        return execute
+
+    return read_file()
+
+
+def create_file_writer_tool(agent_id: str, allowed_file: str) -> Tool:
+    """Create a file writing tool with agent-specific write permissions."""
+
+    @tool
+    def write_file():
+        async def execute(file_path: str, content: str) -> str:
+            """
+            Write content to a Python file (restricted by agent permissions).
+
+            Args:
+                file_path: Path to the file to write (relative to repo root)
+                content: The content to write to the file
+
+            Returns:
+                Success message or error
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError("Sandbox environment not available")
+
+                # Check write permissions for this agent
+                if file_path != allowed_file:
+                    raise ToolError(
+                        f"Agent {agent_id} only has write access to {allowed_file}. "
+                        f"Cannot write to {file_path}"
+                    )
+
+                # Write the file
+                await sandbox_env.write_file(f"/workspace/{file_path}", content)
+
+                # Log the modification
+                log_path = f"/workspace/.agent_logs/{agent_id}_modifications.log"
+                log_entry = f"Modified {file_path} at step {asyncio.current_task().get_name()}\n"
+
+                try:
+                    existing_log = await sandbox_env.read_file(log_path)
+                    await sandbox_env.write_file(log_path, existing_log + log_entry)
+                except FileNotFoundError:
+                    await sandbox_env.write_file(log_path, log_entry)
+
+                return f"[Agent {agent_id}] Successfully wrote to {file_path}"
+
+            except ToolError:
+                raise
+            except Exception as e:
+                raise ToolError(f"Error writing file: {str(e)}")
+
+        return execute
+
+    return write_file()
+
+
+def create_list_files_tool(agent_id: str) -> Tool:
+    """Create a tool to list all Python files in the repository."""
+
+    @tool
+    def list_files():
+        async def execute(directory: str = ".") -> str:
+            """
+            List all Python files in the specified directory.
+
+            Args:
+                directory: Directory to list files from (default: repo root)
+
+            Returns:
+                List of Python files in the directory
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError("Sandbox environment not available")
+
+                # Execute ls command to list Python files
+                result = await sandbox_env.exec(
+                    ["find", f"/workspace/{directory}", "-name", "*.py", "-type", "f"]
+                )
+
+                if result.returncode != 0:
+                    raise ToolError(f"Error listing files: {result.stderr}")
+
+                files = result.stdout.strip().split('\n')
+                files = [f.replace('/workspace/', '') for f in files if f]
+
+                return f"[Agent {agent_id}] Python files in {directory}:\n" + '\n'.join(files)
+
+            except Exception as e:
+                raise ToolError(f"Error listing files: {str(e)}")
+
+        return execute
+
+    return list_files()
+
+
+def create_run_tests_tool(agent_id: str) -> Tool:
+    """Create a tool to run tests and validate changes."""
+
+    @tool
+    def run_tests():
+        async def execute(test_file: Optional[str] = None) -> str:
+            """
+            Run Python tests to validate the changes.
+
+            Args:
+                test_file: Specific test file to run (optional)
+
+            Returns:
+                Test results
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError("Sandbox environment not available")
+
+                if test_file:
+                    cmd = ["python", "-m", "pytest", f"/workspace/{test_file}", "-v"]
+                else:
+                    cmd = ["python", "-m", "pytest", "/workspace", "-v"]
+
+                result = await sandbox_env.exec(cmd)
+
+                return f"[Agent {agent_id}] Test results:\n{result.stdout}\n{result.stderr}"
+
+            except Exception as e:
+                raise ToolError(f"Error running tests: {str(e)}")
+
+        return execute
+
+    return run_tests()
