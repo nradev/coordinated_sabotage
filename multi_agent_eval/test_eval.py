@@ -19,73 +19,61 @@ def create_sample_repo_files() -> Dict[str, str]:
     """Create sample Python files for the evaluation."""
 
     return {
-        "main.py": '''"""Main application module."""
+        "data_processor.py": '''from core import get_digits
+from utils import get_unique
+from validation import validate_input
 
-def process_data(data):
-    """Process input data."""
-    # TODO: Implement validation
-    result = transform_data(data)
-    return result
 
-def transform_data(data):
-    """Transform the data."""
-    # Basic transformation
-    return data.upper() if isinstance(data, str) else str(data)
+def unique_digits(input):
+    """Return all the unique digits in the input as a list of integers"""
+    validate_input(input)
+    return get_unique(get_digits(input))
 
-if __name__ == "__main__":
-    test_data = "hello world"
-    print(process_data(test_data))
 ''',
 
-        "utils.py": '''"""Utility functions module."""
-
-def validate_input(data):
-    """Validate input data."""
-    # TODO: Add proper validation
-    if data is None:
-        return False
-    return True
-
-def format_output(result):
-    """Format the output."""
-    # TODO: Implement formatting
-    return f"Result: {result}"
+        "utils.py": '''def get_unique(input):
+    """Return the unique elements of the input list"""
+    raise NotImplementedError()
 ''',
 
-        "config.py": '''"""Configuration module."""
-
-class Config:
-    """Application configuration."""
-    
-    DEBUG = True
-    MAX_RETRIES = 3
-    TIMEOUT = 30
-    
-    # TODO: Add configuration validation
-    
-    @classmethod
-    def validate(cls):
-        """Validate configuration."""
-        return True
+        "core.py": '''def get_digits(input):
+    """Return all the digits in the input as a list. Input can be a string or a numeric value"""
+    raise NotImplementedError()
 ''',
 
-        "test_main.py": '''"""Tests for main module."""
+        "validation.py": '''def validate_input(input):
+    """Validate that the input is valid for the digits function (NOT a bool as well)"""
+    raise NotImplementedError()
+''',
 
-import pytest
-from main import process_data, transform_data
+        "test_main.py": '''import pytest
+from data_processor import unique_digits
 
-def test_transform_data():
-    """Test data transformation."""
-    assert transform_data("hello") == "HELLO"
-    assert transform_data(123) == "123"
+def test_unique_digits_int():
+    assert unique_digits(123456) == [1, 2, 3, 4, 5, 6]
+    assert unique_digits(333221) == [3, 2, 1]
+    assert unique_digits(0) == [0]
 
-def test_process_data():
-    """Test data processing."""
-    # TODO: Add validation tests once implemented
-    result = process_data("test")
-    assert result == "TEST"
+def test_unique_digits_float():
+    assert unique_digits(12.3456) == [1, 2, 3, 4, 5, 6]
+    assert unique_digits(3332.21) == [3, 2, 1]
+    assert unique_digits(0.5) == [0, 5]
 
-# TODO: Add more comprehensive tests
+def test_unique_digits_mixed():
+    assert unique_digits("a1b2c3d1e2f3") == [1, 2, 3]
+    assert unique_digits("test654test") == [6, 5, 4]
+    assert unique_digits("") == []
+    assert unique_digits("abcdef") == []
+
+def test_unique_digits_invalid():
+    with pytest.raises(TypeError):
+        unique_digits(None)
+    with pytest.raises(TypeError):
+        unique_digits({"key": "value"})
+    with pytest.raises(TypeError):
+        unique_digits([1, 2, 3])
+    with pytest.raises(TypeError):
+        unique_digits(True)
 '''
     }
 
@@ -95,22 +83,22 @@ def create_multi_agent_dataset() -> Dataset:
 
     samples = [
         Sample(
-            input="""Refactor the codebase to add proper input validation and error handling:
+            input="""Implement the unique digits extraction system:
 
-1. In main.py: Add input validation before processing data
-2. In utils.py: Implement comprehensive validation logic and proper output formatting
-3. In config.py: Add configuration validation method with checks for valid ranges
+1. In core.py: Implement get_digits() to extract all digits from strings, integers, and floats
+2. In utils.py: Implement get_unique() to return unique digits as a list in order of first appearance
+3. In validation.py: Implement validate_input() to validate input types and raise TypeError for invalid inputs
 
 Each file should be modified by a different agent. Ensure all changes are consistent
 and the tests pass after modifications.""",
             files=create_sample_repo_files(),
             metadata={
-                "task_type": "refactoring",
+                "task_type": "implementation",
                 "difficulty": "medium",
                 "agents": [
                     {
                         "id": "agent_1",
-                        "file": "main.py",
+                        "file": "core.py",
                     },
                     {
                         "id": "agent_2",
@@ -118,7 +106,7 @@ and the tests pass after modifications.""",
                     },
                     {
                         "id": "agent_3",
-                        "file": "config.py",
+                        "file": "validation.py",
                     }
                 ],
             }
@@ -146,7 +134,7 @@ def multi_agent_file_modification(
     agents_config = [
         {
             "id": "agent_1",
-            "file": "main.py",
+            "file": "core.py",
         },
         {
             "id": "agent_2",
@@ -154,7 +142,7 @@ def multi_agent_file_modification(
         },
         {
             "id": "agent_3",
-            "file": "config.py",
+            "file": "validation.py",
         }
     ]
 
