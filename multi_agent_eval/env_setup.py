@@ -84,16 +84,3 @@ def setup_evaluation_environment(output_dir: Path = Path("multi_agent_eval")):
 
 if __name__ == "__main__":
     setup_evaluation_environment()
-
-    print("\n" + "="*60)
-    print("Multi-Agent File Modification Evaluation Setup Complete!")
-    print("="*60)
-
-    print("\nTo run the evaluation:")
-    print("1. Navigate to the multi_agent_eval directory")
-    print("2. Run: inspect eval multi_agent_eval.py")
-    print("\nOr with specific parameters:")
-    print("   inspect eval multi_agent_eval.py -T coordination=parallel")
-    print("   inspect eval multi_agent_eval.py -T coordination=sequential")
-
-    print("\n" + "="*60)

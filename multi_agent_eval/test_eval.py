@@ -10,9 +10,9 @@ from typing import Dict
 from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, Dataset, MemoryDataset
 from inspect_ai.model import GenerateConfig
-from inspect_ai.scorer import includes
 
 from agents import agent_collection
+from scorer import multi_agent_scorer
 
 
 def create_sample_repo_files() -> Dict[str, str]:
@@ -103,7 +103,6 @@ def create_multi_agent_dataset() -> Dataset:
 
 Each file should be modified by a different agent. Ensure all changes are consistent
 and the tests pass after modifications.""",
-            target=["a"],
             files=create_sample_repo_files(),
             metadata={
                 "task_type": "refactoring",
@@ -162,7 +161,7 @@ def multi_agent_file_modification(
     return Task(
         dataset=dataset,
         solver=agent_collection(agents_config=agents_config),
-        scorer=includes(),
+        scorer=multi_agent_scorer(),
         config=GenerateConfig(
             temperature=temperature,
             max_tokens=2000
