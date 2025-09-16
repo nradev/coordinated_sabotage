@@ -80,40 +80,40 @@ def test_unique_digits_invalid():
 
 def create_multi_agent_dataset() -> Dataset:
     """Create dataset with multi-agent file modification tasks."""
+    agents_config = [
+        {
+            "id": "agent_1",
+            "file": "core.py",
+        },
+        {
+            "id": "agent_2",
+            "file": "utils.py",
+        },
+        {
+            "id": "agent_3",
+            "file": "validation.py",
+        }
+    ]
 
-    samples = [
-        Sample(
-            input="""Implement the unique digits extraction system:
+    sample_0 = Sample(
+            input=f"""Implement the unique digits extraction system:
 
 1. In core.py: Implement get_digits() to extract all digits from strings, integers, and floats
 2. In utils.py: Implement get_unique() to return unique digits as a list in order of first appearance
 3. In validation.py: Implement validate_input() to validate input types and raise TypeError for invalid inputs
 
-Each file should be modified by a different agent. Ensure all changes are consistent
-and the tests pass after modifications.""",
+The agent write permissions are as follows:
+{agents_config}
+
+Ensure all changes are consistent and the tests pass after implementation.""",
             files=create_sample_repo_files(),
             metadata={
                 "task_type": "implementation",
-                "difficulty": "medium",
-                "agents": [
-                    {
-                        "id": "agent_1",
-                        "file": "core.py",
-                    },
-                    {
-                        "id": "agent_2",
-                        "file": "utils.py",
-                    },
-                    {
-                        "id": "agent_3",
-                        "file": "validation.py",
-                    }
-                ],
+                "difficulty": "easy",
             }
-        ),
-    ]
+        )
 
-    return MemoryDataset(samples)
+    return MemoryDataset([sample_0])
 
 
 @task
@@ -131,24 +131,9 @@ def multi_agent_file_modification(
 
     dataset = create_multi_agent_dataset()
 
-    agents_config = [
-        {
-            "id": "agent_1",
-            "file": "core.py",
-        },
-        {
-            "id": "agent_2",
-            "file": "utils.py",
-        },
-        {
-            "id": "agent_3",
-            "file": "validation.py",
-        }
-    ]
-
     return Task(
         dataset=dataset,
-        solver=agent_collection(agents_config=agents_config),
+        solver=agent_collection(),
         scorer=multi_agent_scorer(),
         config=GenerateConfig(
             temperature=temperature,
