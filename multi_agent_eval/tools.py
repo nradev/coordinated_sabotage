@@ -1,12 +1,15 @@
 import asyncio
-from typing import Optional
+from typing import Optional, List
 
 from inspect_ai.tool import Tool, tool, ToolError
 from inspect_ai.util import sandbox
 
 
-def create_file_reader_tool(agent_id: str) -> Tool:
-    """Create a file reading tool for an agent that can read all files."""
+def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None) -> Tool:
+    """
+    Create a file writing tool with agent-specific write permissions.
+    If read_access is None, there are no restrictions.
+    """
 
     @tool
     def read_file():
@@ -25,6 +28,13 @@ def create_file_reader_tool(agent_id: str) -> Tool:
                 if not sandbox_env:
                     raise ToolError("Sandbox environment not available")
 
+                # Check read permissions for this agent
+                if read_access is not None and file_path not in read_access:
+                    raise ToolError(
+                        f"Agent {agent_id} only has read access to {read_access}. "
+                        f"Cannot read from {file_path}"
+                    )
+
                 # Ensure the file path is within the repo
                 if file_path.startswith('/') or '..' in file_path:
                     raise ToolError("Invalid file path. Use relative paths within the repo.")
@@ -42,8 +52,11 @@ def create_file_reader_tool(agent_id: str) -> Tool:
     return read_file()
 
 
-def create_file_writer_tool(agent_id: str, allowed_file: str) -> Tool:
-    """Create a file writing tool with agent-specific write permissions."""
+def create_file_writer_tool(agent_id: str, write_access: List[str] | None = None) -> Tool:
+    """
+    Create a file writing tool with agent-specific write permissions.
+    If write_access is None, there are no restrictions.
+    """
 
     @tool
     def write_file():
@@ -64,9 +77,9 @@ def create_file_writer_tool(agent_id: str, allowed_file: str) -> Tool:
                     raise ToolError("Sandbox environment not available")
 
                 # Check write permissions for this agent
-                if file_path != allowed_file:
+                if write_access is not None and file_path not in write_access:
                     raise ToolError(
-                        f"Agent {agent_id} only has write access to {allowed_file}. "
+                        f"Agent {agent_id} only has write access to {write_access}. "
                         f"Cannot write to {file_path}"
                     )
 

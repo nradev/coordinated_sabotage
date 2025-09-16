@@ -83,17 +83,22 @@ def create_multi_agent_dataset() -> Dataset:
     agents_config = [
         {
             "id": "agent_1",
-            "file": "core.py",
+            "read_access": "ALL",
+            "write_access": ["core.py"],
         },
         {
             "id": "agent_2",
-            "file": "utils.py",
+            "read_access": "ALL",
+            "write_access": ["utils.py"],
         },
         {
             "id": "agent_3",
-            "file": "validation.py",
+            "read_access": "ALL",
+            "write_access": ["validation.py"],
         }
     ]
+    # TODO if this gets more complex make a AgentsConfig class. Then extract_agents_config_from_AgentState can become
+    #  its class method.
 
     sample_0 = Sample(
             input=f"""Implement the unique digits extraction system:
