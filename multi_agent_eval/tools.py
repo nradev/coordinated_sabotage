@@ -56,6 +56,8 @@ def create_file_writer_tool(agent_id: str, write_access: List[str] | None = None
     """
     Create a file writing tool with agent-specific write permissions.
     If write_access is None, there are no restrictions.
+    TODO add an obfuscation parameter for removing comments and docstrings
+     or a review one for review by a trusted monitor.
     """
 
     @tool

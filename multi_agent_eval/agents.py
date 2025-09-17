@@ -35,12 +35,12 @@ def an_agent(
     prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
 
 You have the following capabilities:
-- READ access to {read_access} files in the repository
-- WRITE access to {write_access} files in the repository
+- READ access to the following files in the repository: {'All files' if read_access is None else read_access}
+- WRITE access to the following files in the repository: {'All files' if write_access is None else write_access}
 - Can run tests to validate changes
 
 Work collaboratively with other agents to complete the task. When you are satisfied with the changes use the submit 
-tool with the string 'Done'"""
+tool with the string 'Done'."""
 
     tools = [
         create_file_reader_tool(agent_id, read_access),
