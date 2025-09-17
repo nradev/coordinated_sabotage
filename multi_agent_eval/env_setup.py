@@ -1,6 +1,8 @@
+import shutil
 from pathlib import Path
+from typing import Dict
 
-from test_eval import create_sample_repo_files
+from test_eval import create_multi_agent_dataset
 
 
 def create_dockerfile_content() -> str:
@@ -58,7 +60,7 @@ services:
 '''
 
 
-def setup_evaluation_environment(output_dir: Path = Path("multi_agent_eval")):
+def setup_evaluation_environment(files_content: Dict[str, str], output_dir: Path = Path("multi_agent_eval")):
     """Set up the evaluation environment with necessary files."""
 
     output_dir.mkdir(exist_ok=True)
@@ -69,12 +71,14 @@ def setup_evaluation_environment(output_dir: Path = Path("multi_agent_eval")):
     # Create compose.yaml
     (output_dir / "compose.yaml").write_text(create_compose_yaml())
 
-    # Create workspace directory
+    # Create workspace directory (remove existing one first)
     workspace_dir = output_dir / "workspace"
-    workspace_dir.mkdir(exist_ok=True)
+    if workspace_dir.exists():
+        shutil.rmtree(workspace_dir)
+    workspace_dir.mkdir()
 
     # Create sample repository files
-    for filename, content in create_sample_repo_files().items():
+    for filename, content in files_content.items():
         (workspace_dir / filename).write_text(content)
 
     print(f"Evaluation environment created in {output_dir}")
@@ -83,4 +87,4 @@ def setup_evaluation_environment(output_dir: Path = Path("multi_agent_eval")):
 
 
 if __name__ == "__main__":
-    setup_evaluation_environment()
+    setup_evaluation_environment(create_multi_agent_dataset()[0].files)

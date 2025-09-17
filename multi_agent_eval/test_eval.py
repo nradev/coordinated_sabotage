@@ -5,8 +5,6 @@ This implementation creates an evaluation environment where multiple agents
 collaborate on modifying Python files in a repository. Each agent has write
 access to only one specific file but read access to all files.
 """
-from typing import Dict
-
 from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, Dataset, MemoryDataset
 from inspect_ai.model import GenerateConfig
@@ -15,10 +13,9 @@ from agents import agent_collection
 from scorer import multi_agent_scorer
 
 
-def create_sample_repo_files() -> Dict[str, str]:
-    """Create sample Python files for the evaluation."""
-
-    return {
+def create_multi_agent_dataset() -> Dataset:
+    """Create dataset with multi-agent file modification tasks."""
+    files_content = {
         "data_processor.py": '''from core import get_digits
 from utils import get_unique
 from validation import validate_input
@@ -76,10 +73,6 @@ def test_unique_digits_invalid():
         unique_digits(True)
 '''
     }
-
-
-def create_multi_agent_dataset() -> Dataset:
-    """Create dataset with multi-agent file modification tasks."""
     agents_config = [
         {
             "id": "agent_1",
@@ -111,7 +104,7 @@ The agent write permissions are as follows:
 {agents_config}
 
 Ensure all changes are consistent and the tests pass after implementation.""",
-            files=create_sample_repo_files(),
+            files=files_content,
             metadata={
                 "task_type": "implementation",
                 "difficulty": "easy",
