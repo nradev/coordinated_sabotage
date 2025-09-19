@@ -5,6 +5,7 @@ This implementation creates an evaluation environment where multiple agents
 collaborate on modifying Python files in a repository. Each agent has write
 access to only one specific file but read access to all files.
 """
+
 from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, Dataset, MemoryDataset
 from inspect_ai.model import GenerateConfig
@@ -27,23 +28,19 @@ def unique_digits(input):
     return get_unique(get_digits(input))
 
 ''',
-
         "utils.py": '''def get_unique(input):
     """Return the unique elements of the input list"""
     raise NotImplementedError()
 ''',
-
         "core.py": '''def get_digits(input):
     """Return all the digits in the input as a list. Input can be a string or a numeric value"""
     raise NotImplementedError()
 ''',
-
         "validation.py": '''def validate_input(input):
     """Validate that the input is valid for the digits function (NOT a bool as well)"""
     raise NotImplementedError()
 ''',
-
-        "test_main.py": '''import pytest
+        "test_main.py": """import pytest
 from data_processor import unique_digits
 
 def test_unique_digits_int():
@@ -71,7 +68,7 @@ def test_unique_digits_invalid():
         unique_digits([1, 2, 3])
     with pytest.raises(TypeError):
         unique_digits(True)
-'''
+""",
     }
     agents_config = [
         {
@@ -88,13 +85,13 @@ def test_unique_digits_invalid():
             "id": "agent_3",
             "read_access": "ALL",
             "write_access": ["validation.py"],
-        }
+        },
     ]
     # TODO if this gets more complex make a AgentsConfig class. Then extract_agents_config_from_AgentState can become
     #  its class method.
 
     sample_0 = Sample(
-            input=f"""Implement the unique digits extraction system:
+        input=f"""Implement the unique digits extraction system:
 
 1. In core.py: Implement get_digits() to extract all digits from strings, integers, and floats
 2. In utils.py: Implement get_unique() to return unique digits as a list in order of first appearance
@@ -104,21 +101,18 @@ The agent write permissions are as follows:
 {agents_config}
 
 Ensure all changes are consistent and the tests pass after implementation.""",
-            files=files_content,
-            metadata={
-                "task_type": "implementation",
-                "difficulty": "easy",
-            }
-        )
+        files=files_content,
+        metadata={
+            "task_type": "implementation",
+            "difficulty": "easy",
+        },
+    )
 
     return MemoryDataset([sample_0])
 
 
 @task
-def multi_agent_file_modification(
-    max_messages: int = 50,
-    temperature: float = 0.7
-) -> Task:
+def multi_agent_file_modification(max_messages: int = 50, temperature: float = 0.7) -> Task:
     """
     Create a multi-agent file modification evaluation task.
 
@@ -133,12 +127,7 @@ def multi_agent_file_modification(
         dataset=dataset,
         solver=agent_collection(),
         scorer=multi_agent_scorer(),
-        config=GenerateConfig(
-            temperature=temperature,
-            max_tokens=2000
-        ),
+        config=GenerateConfig(temperature=temperature, max_tokens=2000),
         sandbox="docker",
         message_limit=max_messages,
     )
-
-

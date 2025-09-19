@@ -31,12 +31,11 @@ def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None)
                 # Check read permissions for this agent
                 if read_access is not None and file_path not in read_access:
                     raise ToolError(
-                        f"Agent {agent_id} only has read access to {read_access}. "
-                        f"Cannot read from {file_path}"
+                        f"Agent {agent_id} only has read access to {read_access}. Cannot read from {file_path}"
                     )
 
                 # Ensure the file path is within the repo
-                if file_path.startswith('/') or '..' in file_path:
+                if file_path.startswith("/") or ".." in file_path:
                     raise ToolError("Invalid file path. Use relative paths within the repo.")
 
                 contents = await sandbox_env.read_file(f"/workspace/{file_path}")
@@ -81,8 +80,7 @@ def create_file_writer_tool(agent_id: str, write_access: List[str] | None = None
                 # Check write permissions for this agent
                 if write_access is not None and file_path not in write_access:
                     raise ToolError(
-                        f"Agent {agent_id} only has write access to {write_access}. "
-                        f"Cannot write to {file_path}"
+                        f"Agent {agent_id} only has write access to {write_access}. Cannot write to {file_path}"
                     )
 
                 # Write the file
@@ -131,17 +129,15 @@ def create_list_files_tool(agent_id: str) -> Tool:
                     raise ToolError("Sandbox environment not available")
 
                 # Execute ls command to list Python files
-                result = await sandbox_env.exec(
-                    ["find", f"/workspace/{directory}", "-name", "*.py", "-type", "f"]
-                )
+                result = await sandbox_env.exec(["find", f"/workspace/{directory}", "-name", "*.py", "-type", "f"])
 
                 if result.returncode != 0:
                     raise ToolError(f"Error listing files: {result.stderr}")
 
-                files = result.stdout.strip().split('\n')
-                files = [f.replace('/workspace/', '') for f in files if f]
+                files = result.stdout.strip().split("\n")
+                files = [f.replace("/workspace/", "") for f in files if f]
 
-                return f"[Agent {agent_id}] Python files in {directory}:\n" + '\n'.join(files)
+                return f"[Agent {agent_id}] Python files in {directory}:\n" + "\n".join(files)
 
             except Exception as e:
                 raise ToolError(f"Error listing files: {str(e)}")
