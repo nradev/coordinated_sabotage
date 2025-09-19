@@ -103,7 +103,7 @@ def agent_collection(
         else:
             config = agents_config
 
-        # collect is prferred over asyncio.gather for
+        # collect is preferred over asyncio.gather according to inspect.ai and enables the use of trio as backend
         await collect(
             *(
                 run(
