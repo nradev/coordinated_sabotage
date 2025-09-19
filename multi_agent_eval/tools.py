@@ -1,7 +1,8 @@
 import asyncio
 from typing import Optional, List
 
-from inspect_ai.tool import Tool, tool, ToolError
+from inspect_ai.agent import AgentSubmit
+from inspect_ai.tool import Tool, tool, ToolError, ToolResult
 from inspect_ai.util import sandbox
 
 
@@ -182,3 +183,21 @@ def create_run_tests_tool(agent_id: str) -> Tool:
         return execute
 
     return run_tests()
+
+
+def create_done_tool(agent_id: str) -> AgentSubmit:
+    """Create a tool to indicate that the agent is done with all file edits."""
+
+    @tool(name="done")
+    def done_tool():
+        async def execute() -> str:
+            """Indicate that the agent is done with all file edits."""
+            return f"Agent {agent_id} is done."
+
+        return execute
+
+    return AgentSubmit(
+        name="done",
+        description="Indicate that the agent is done with all file edits.",
+        tool=done_tool(),
+    )
