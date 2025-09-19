@@ -115,7 +115,7 @@ def agent_collection(
                     state,
                 )
                 for agent_config in config
-            ]
+            )
         )
 
         return state
