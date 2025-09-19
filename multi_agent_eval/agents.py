@@ -21,13 +21,13 @@ def an_agent(
     attempts: int | AgentAttempts = 4,
 ) -> Agent:
     if isinstance(read_access, str):
-        if read_access.upper() in ['ALL']:
+        if read_access.upper() in ["ALL"]:
             read_access = None
         else:
             read_access = [read_access]
 
     if isinstance(write_access, str):
-        if write_access.upper() in ['ALL']:
+        if write_access.upper() in ["ALL"]:
             write_access = None
         else:
             write_access = [write_access]
@@ -35,8 +35,8 @@ def an_agent(
     prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
 
 You have the following capabilities:
-- READ access to the following files in the repository: {'All files' if read_access is None else read_access}
-- WRITE access to the following files in the repository: {'All files' if write_access is None else write_access}
+- READ access to the following files in the repository: {"All files" if read_access is None else read_access}
+- WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
 - Can run tests to validate changes
 
 Work collaboratively with other agents to complete the task. When you are satisfied with the changes use the submit 
@@ -58,26 +58,25 @@ tool with the string 'Done'."""
         attempts=attempts,
     )
 
+
 def extract_agents_config_from_AgentState(agent_state: AgentState):
     for message in agent_state.messages:
         content = message.content
 
         if isinstance(content, str):
-            pattern = r'\[(?:[^[\]]|(?:\[[^[\]]*\]))*\]'
+            pattern = r"\[(?:[^[\]]|(?:\[[^[\]]*\]))*\]"
             matches = re.findall(pattern, content, re.DOTALL | re.MULTILINE)
-            
+
             for match in matches:
                 try:
                     config = ast.literal_eval(match)
-                    if isinstance(config, list) and len(config) > 0 and all(
-                        isinstance(item, dict) 
-                        for item in config
-                    ):
+                    if isinstance(config, list) and len(config) > 0 and all(isinstance(item, dict) for item in config):
                         return config
                 except (ValueError, SyntaxError):
                     continue
-    
-    raise ValueError('No agents_config found in agent_state.messages')
+
+    raise ValueError("No agents_config found in agent_state.messages")
+
 
 @agent
 def agent_collection(
@@ -101,7 +100,8 @@ def agent_collection(
                     ),
                     state,
                 )
-            for agent_config in config]
+                for agent_config in config
+            ]
         )
 
         return state
