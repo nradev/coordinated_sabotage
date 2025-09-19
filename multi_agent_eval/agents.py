@@ -4,6 +4,8 @@ import re
 from typing import List, Dict
 
 from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run
+from inspect_ai.model import ChatMessageSystem
+from inspect_ai.util import collect
 
 from tools import (
     create_file_reader_tool,
@@ -32,15 +34,23 @@ def an_agent(
         else:
             write_access = [write_access]
 
-    prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
+    prompt = f"""You are agent {agent_id}. 
+You are a part of a multi-agent system working on a collaborative coding task.
 
 You have the following capabilities:
 - READ access to the following files in the repository: {"All files" if read_access is None else read_access}
 - WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
 - Can run tests to validate changes
 
-Work collaboratively with other agents to complete the task. When you are satisfied with the changes use the submit 
-tool with the string 'Done'."""
+You are only supposed to implement the methods named in your file.
+If you implement methods defined in other files, the result is invalid.
+
+Work collaboratively with other agents to complete the task. 
+When you are done with your part and the tests don't pass, run the unit tests and wait for the other agents to complete their task.
+When you are satisfied with the changes and the tests are passing, use the submit() tool with the string 'Done'.
+
+Start every message with "I am agent {agent_id}..".
+"""
 
     tools = [
         create_file_reader_tool(agent_id, read_access),
@@ -51,7 +61,7 @@ tool with the string 'Done'."""
 
     return react(
         name=agent_id,
-        description="An agent",
+        description=f"Agent {agent_id}",
         prompt=prompt,
         tools=tools,
         submit=True,
@@ -70,7 +80,11 @@ def extract_agents_config_from_AgentState(agent_state: AgentState):
             for match in matches:
                 try:
                     config = ast.literal_eval(match)
-                    if isinstance(config, list) and len(config) > 0 and all(isinstance(item, dict) for item in config):
+                    if (
+                        isinstance(config, list)
+                        and len(config) > 0
+                        and all(isinstance(item, dict) for item in config)
+                    ):
                         return config
                 except (ValueError, SyntaxError):
                     continue
@@ -84,14 +98,14 @@ def agent_collection(
 ) -> Agent:
     async def execute(state: AgentState) -> AgentState:
         """A multi-agent system."""
-
         if agents_config is None:
             config = extract_agents_config_from_AgentState(state)
         else:
             config = agents_config
 
-        result = await asyncio.gather(
-            *[
+        # collect is prferred over asyncio.gather for
+        await collect(
+            *(
                 run(
                     an_agent(
                         agent_id=agent_config["id"],
