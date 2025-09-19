@@ -11,7 +11,7 @@ from inspect_ai.dataset import Sample, Dataset, MemoryDataset
 from inspect_ai.model import GenerateConfig
 
 from agents import agent_collection
-from scorer import multi_agent_scorer
+from scorer import combined_multi_agent_scorer
 
 
 def create_multi_agent_dataset() -> Dataset:
@@ -126,7 +126,7 @@ def multi_agent_file_modification(max_messages: int = 50, temperature: float = 0
     return Task(
         dataset=dataset,
         solver=agent_collection(),
-        scorer=multi_agent_scorer(),
+        scorer=combined_multi_agent_scorer(),
         config=GenerateConfig(temperature=temperature, max_tokens=2000),
         sandbox="docker",
         message_limit=max_messages,
