@@ -8,7 +8,7 @@ from test_eval import create_multi_agent_dataset
 def create_dockerfile_content() -> str:
     """Create Dockerfile content for the sandbox environment."""
 
-    return '''FROM python:3.11-slim
+    return """FROM python:3.11-slim
 
 # Install required packages
 RUN apt-get update && apt-get install -y \\
@@ -36,13 +36,13 @@ USER agent
 
 # Keep container running
 CMD ["tail", "-f", "/dev/null"]
-'''
+"""
 
 
 def create_compose_yaml() -> str:
     """Create docker-compose.yaml for the sandbox."""
 
-    return '''version: '3.8'
+    return """version: '3.8'
 
 services:
   default:
@@ -57,7 +57,7 @@ services:
     mem_limit: 2g
     cpus: 2.0
     network_mode: bridge
-'''
+"""
 
 
 def setup_evaluation_environment(files_content: Dict[str, str], output_dir: Path = Path("multi_agent_eval")):
