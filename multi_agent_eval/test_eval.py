@@ -6,6 +6,7 @@ collaborate on modifying Python files in a repository. Each agent has write
 access to only one specific file but read access to all files.
 """
 
+from dataclasses import dataclass
 from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, Dataset, MemoryDataset
 from inspect_ai.model import GenerateConfig
@@ -70,6 +71,13 @@ def test_unique_digits_invalid():
         unique_digits(True)
 """,
     }
+
+    @dataclass
+    class AgentConfig:
+        id: str
+        read_access: str
+        write_acess: str
+
     agents_config = [
         {
             "id": "agent_1",
@@ -97,7 +105,7 @@ def test_unique_digits_invalid():
 2. In utils.py: Implement get_unique() to return unique digits as a list in order of first appearance
 3. In validation.py: Implement validate_input() to validate input types and raise TypeError for invalid inputs
 
-The agent write permissions are as follows:
+Remeber, you only need to implement the features in your files. Here are the files you have access to:
 {agents_config}
 
 Ensure all changes are consistent and the tests pass after implementation.""",

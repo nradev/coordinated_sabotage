@@ -115,7 +115,23 @@ def agent_collection(
                     state,
                 )
                 for agent_config in config
-            ]
+            )
+        )
+
+        return state
+
+    return execute
+
+
+@agent
+def debug_submit_agent() -> Agent:
+    """Debug agent that immediately calls submit tool."""
+
+    async def execute(state: AgentState) -> AgentState:
+        """Just submit immediately for debugging."""
+        # Add a submit message
+        state.messages.append(
+            ChatMessageSystem(content="You are a debug agent and just finish.")
         )
 
         return state
