@@ -3,7 +3,7 @@ import ast
 import re
 from typing import List, Dict
 
-from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run
+from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run, AgentPrompt
 
 from tools import (
     create_file_reader_tool,
@@ -32,15 +32,23 @@ def create_agent(
         else:
             write_access = [write_access]
 
-    prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
+    assistant_prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
 
 You have the following capabilities:
 - READ access to the following files in the repository: {"All files" if read_access is None else read_access}
 - WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
 - Can run tests to validate changes
 
-Work collaboratively with other agents to complete the task. When you are satisfied with your changes use the `done()` 
+Work collaboratively with other agents to complete the task. """
+
+    submit_prompt = """When you are satisfied with your changes use the `{submit}()` 
 tool to indicate your work is done."""
+
+    prompt = AgentPrompt(
+        instructions=None,
+        assistant_prompt=assistant_prompt,
+        submit_prompt=submit_prompt,
+    )
 
     nudge_message = """Please consider if you need to make any further changes to the files you are responsible for. 
 If you believe you have completed your part of the task, please call the `{submit}()`."""
