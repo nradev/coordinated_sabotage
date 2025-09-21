@@ -3,22 +3,22 @@ import ast
 import re
 from typing import List, Dict
 
-from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run
+from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run, AgentPrompt
 
 from tools import (
     create_file_reader_tool,
     create_file_writer_tool,
     create_list_files_tool,
     create_run_tests_tool,
+    create_done_tool,
 )
 
 
-@agent
-def an_agent(
+def create_agent(
     agent_id: str,
     read_access: str | List[str],
     write_access: str | List[str],
-    attempts: int | AgentAttempts = 4,
+    attempts: int | AgentAttempts = 1,
 ) -> Agent:
     if isinstance(read_access, str):
         if read_access.upper() in ["ALL"]:
@@ -32,15 +32,26 @@ def an_agent(
         else:
             write_access = [write_access]
 
-    prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
+    assistant_prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
 
 You have the following capabilities:
 - READ access to the following files in the repository: {"All files" if read_access is None else read_access}
 - WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
 - Can run tests to validate changes
 
-Work collaboratively with other agents to complete the task. When you are satisfied with the changes use the submit 
-tool with the string 'Done'."""
+Work collaboratively with other agents to complete the task. """
+
+    submit_prompt = """When you are satisfied with your changes use the `{submit}()` 
+tool to indicate your work is done."""
+
+    prompt = AgentPrompt(
+        instructions=None,
+        assistant_prompt=assistant_prompt,
+        submit_prompt=submit_prompt,
+    )
+
+    nudge_message = """Please consider if you need to make any further changes to the files you are responsible for. 
+If you believe you have completed your part of the task, please call the `{submit}()`."""
 
     tools = [
         create_file_reader_tool(agent_id, read_access),
@@ -54,7 +65,8 @@ tool with the string 'Done'."""
         description="An agent",
         prompt=prompt,
         tools=tools,
-        submit=True,
+        on_continue=nudge_message,
+        submit=create_done_tool(agent_id),
         attempts=attempts,
     )
 
@@ -93,7 +105,7 @@ def agent_collection(
         result = await asyncio.gather(
             *[
                 run(
-                    an_agent(
+                    create_agent(
                         agent_id=agent_config["id"],
                         read_access=agent_config.get("read_access"),
                         write_access=agent_config.get("write_access"),
