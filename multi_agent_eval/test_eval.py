@@ -10,7 +10,7 @@ from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, Dataset, MemoryDataset
 from inspect_ai.model import GenerateConfig
 
-from agents import agent_collection
+from agents import AgentConfig, agent_collection_solver
 from scorer import multi_agent_scorer
 
 
@@ -33,7 +33,7 @@ def unique_digits(input):
     raise NotImplementedError()
 ''',
         "core.py": '''def get_digits(input):
-    """Return all the digits in the input as a list. Input can be a string or a numeric value"""
+    """Return all the digits in the input as a list of integers. Input can be a string or a numeric value."""
     raise NotImplementedError()
 ''',
         "validation.py": '''def validate_input(input):
@@ -70,39 +70,47 @@ def test_unique_digits_invalid():
         unique_digits(True)
 """,
     }
+
     agents_config = [
-        {
-            "id": "agent_1",
-            "read_access": "ALL",
-            "write_access": ["core.py"],
-        },
-        {
-            "id": "agent_2",
-            "read_access": "ALL",
-            "write_access": ["utils.py"],
-        },
-        {
-            "id": "agent_3",
-            "read_access": "ALL",
-            "write_access": ["validation.py"],
-        },
+        AgentConfig(
+            id="agent_1",
+            read_access="ALL",
+            write_access=["core.py"],
+            agent_specific_message="""You are responsible for implementing core.py. 
+Work with other agents to ensure the complete system functions correctly.""",
+        ),
+        AgentConfig(
+            id="agent_2",
+            read_access="ALL",
+            write_access=["utils.py"],
+            agent_specific_message="""You are responsible for implementing utils.py.
+Work with other agents to ensure the complete system functions correctly.""",
+        ),
+        AgentConfig(
+            id="agent_3",
+            read_access="ALL",
+            write_access=["validation.py"],
+            agent_specific_message="""You are responsible for implementing validation.py.
+Work with other agents to ensure the complete system functions correctly.""",
+        ),
     ]
+    common_message = f"""Your task is to implement the functions used by unique_digits in the data_processor.py file 
+such that unique_digits performs according to the specification in its docstring.
+
+1. In core.py: Implement get_digits() to extract all digits from strings, integers, and floats
+2. In utils.py: Implement get_unique() to return unique items as a list in order of first appearance
+3. In validation.py: Implement validate_input() to validate input types and raise TypeError for invalid inputs
+
+Ensure all changes are consistent and the tests pass after implementation."""
+
     # TODO if this gets more complex make a AgentsConfig class. Then extract_agents_config_from_AgentState can become
     #  its class method.
 
     sample_0 = Sample(
-        input=f"""Implement the unique digits extraction system:
-
-1. In core.py: Implement get_digits() to extract all digits from strings, integers, and floats
-2. In utils.py: Implement get_unique() to return unique digits as a list in order of first appearance
-3. In validation.py: Implement validate_input() to validate input types and raise TypeError for invalid inputs
-
-The agent write permissions are as follows:
-{agents_config}
-
-Ensure all changes are consistent and the tests pass after implementation.""",
+        input=common_message,
         files=files_content,
         metadata={
+            "agents_config": agents_config,
             "task_type": "implementation",
             "difficulty": "easy",
         },
@@ -125,7 +133,7 @@ def multi_agent_file_modification(max_messages: int = 50, temperature: float = 0
 
     return Task(
         dataset=dataset,
-        solver=agent_collection(),
+        solver=agent_collection_solver(),
         scorer=multi_agent_scorer(),
         config=GenerateConfig(temperature=temperature, max_tokens=2000),
         sandbox="docker",

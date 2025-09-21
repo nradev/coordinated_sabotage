@@ -1,9 +1,12 @@
 import asyncio
 import ast
+from dataclasses import dataclass
 import re
 from typing import List, Dict
 
-from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run, AgentPrompt
+from inspect_ai.agent import AgentAttempts, Agent, react, AgentState, run, AgentPrompt
+from inspect_ai.model import ChatMessageUser
+from inspect_ai.solver import solver, TaskState, Generate, Solver
 
 from tools import (
     create_file_reader_tool,
@@ -12,6 +15,24 @@ from tools import (
     create_run_tests_tool,
     create_done_tool,
 )
+
+
+@dataclass
+class AgentConfig:
+    """Configuration for an agent."""
+
+    id: str
+    read_access: str | list[str]
+    """Path to file or directory to read from. Use 'ALL' to read from all files."""
+    write_access: str | list[str]
+    """Path to file or directory to write to. Use 'ALL' to write to all files."""
+    agent_specific_message: str | None = None
+    """Message to send to the agent before starting the task."""
+    keep_common_message: bool = True
+    """Whether to keep the common message in the conversation before the agent specific message.
+    
+    Note, the common message is not the system prompt.
+    """
 
 
 def create_agent(
@@ -71,51 +92,47 @@ If you believe you have completed your part of the task, please call the `{submi
     )
 
 
-def extract_agents_config_from_AgentState(agent_state: AgentState):
-    for message in agent_state.messages:
-        content = message.content
-
-        if isinstance(content, str):
-            pattern = r"\[(?:[^[\]]|(?:\[[^[\]]*\]))*\]"
-            matches = re.findall(pattern, content, re.DOTALL | re.MULTILINE)
-
-            for match in matches:
-                try:
-                    config = ast.literal_eval(match)
-                    if isinstance(config, list) and len(config) > 0 and all(isinstance(item, dict) for item in config):
-                        return config
-                except (ValueError, SyntaxError):
-                    continue
-
-    raise ValueError("No agents_config found in agent_state.messages")
-
-
-@agent
-def agent_collection(
-    agents_config: List[Dict[str, str]] | None = None,
-) -> Agent:
-    async def execute(state: AgentState) -> AgentState:
+@solver
+def agent_collection_solver(
+    agents_config: List[AgentConfig] | None = None,
+) -> Solver:
+    async def solve(state: TaskState, generate: Generate) -> TaskState | AgentState:
         """A multi-agent system."""
 
-        if agents_config is None:
-            config = extract_agents_config_from_AgentState(state)
-        else:
-            config = agents_config
+        configs: list[AgentConfig] = agents_config or state.metadata["agents_config"]
 
-        result = await asyncio.gather(
-            *[
+        tasks = []
+        for agent_config in configs:
+            specific_message = agent_config.agent_specific_message
+            keep_common_message = agent_config.keep_common_message
+
+            if specific_message is not None:
+                if keep_common_message:
+                    modified_messages = state.messages + [
+                        ChatMessageUser(content=specific_message)
+                    ]
+                else:
+                    modified_messages = state.messages[:-1] + [
+                        ChatMessageUser(content=specific_message)
+                    ]
+                agent_state = AgentState(messages=modified_messages)
+            else:
+                agent_state = state
+
+            tasks.append(
                 run(
                     create_agent(
-                        agent_id=agent_config["id"],
-                        read_access=agent_config.get("read_access"),
-                        write_access=agent_config.get("write_access"),
+                        agent_id=agent_config.id,
+                        read_access=agent_config.read_access,
+                        write_access=agent_config.write_access,
                     ),
-                    state,
+                    agent_state,
                 )
-                for agent_config in config
-            ]
-        )
+            )
+
+        result = await asyncio.gather(*tasks)
+        # TODO result is a List[AgentState]. Should we somehow merge and return it?
 
         return state
 
-    return execute
+    return solve

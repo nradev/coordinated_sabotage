@@ -16,9 +16,7 @@ logger.add(
 )
 
 
-def create_file_reader_tool(
-    agent_id: str, read_access: List[str] | None = None
-) -> Tool:
+def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None) -> Tool:
     """
     Create a file writing tool with agent-specific write permissions.
     If read_access is None, there are no restrictions.
@@ -39,22 +37,17 @@ def create_file_reader_tool(
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(
-                        f"[Agent {agent_id}] Sandbox environment not available"
-                    )
+                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
 
                 # Check read permissions for this agent
                 if read_access is not None and file_path not in read_access:
-
                     raise ToolError(
                         f"[Agent {agent_id}] only has read access to {read_access}. Cannot read from {file_path}"
                     )
 
                 # Ensure the file path is within the repo
                 if file_path.startswith("/") or ".." in file_path:
-                    raise ToolError(
-                        f"[Agent {agent_id}] Invalid file path. Use relative paths within the repo."
-                    )
+                    raise ToolError(f"[Agent {agent_id}] Invalid file path. Use relative paths within the repo.")
 
                 logger.debug(f"[Agent {agent_id}] Reading file {file_path}.")
 
@@ -72,9 +65,7 @@ def create_file_reader_tool(
     return read_file()
 
 
-def create_file_writer_tool(
-    agent_id: str, write_access: List[str] | None = None
-) -> Tool:
+def create_file_writer_tool(agent_id: str, write_access: List[str] | None = None) -> Tool:
     """
     Create a file writing tool with agent-specific write permissions.
     If write_access is None, there are no restrictions.
@@ -98,9 +89,7 @@ def create_file_writer_tool(
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(
-                        f"[Agent {agent_id}] Sandbox environment not available"
-                    )
+                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
 
                 # Check write permissions for this agent
                 if write_access is not None and file_path not in write_access:
@@ -162,28 +151,20 @@ def create_list_files_tool(agent_id: str) -> Tool:
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(
-                        f"[Agent {agent_id}] Sandbox environment not available"
-                    )
+                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
 
                 # Execute ls command to list Python files
-                result = await sandbox_env.exec(
-                    ["find", f"/workspace/{directory}", "-name", "*.py", "-type", "f"]
-                )
+                result = await sandbox_env.exec(["find", f"/workspace/{directory}", "-name", "*.py", "-type", "f"])
 
                 if result.returncode != 0:
-                    raise ToolError(
-                        f"[Agent {agent_id}] Error listing files: {result.stderr}"
-                    )
+                    raise ToolError(f"[Agent {agent_id}] Error listing files: {result.stderr}")
 
                 files = result.stdout.strip().split("\n")
                 files = [f.replace("/workspace/", "") for f in files if f]
 
                 logger.debug(f"[Agent {agent_id}] Found files: {files}")
 
-                return f"[Agent {agent_id}] Python files in {directory}:\n" + "\n".join(
-                    files
-                )
+                return f"[Agent {agent_id}] Python files in {directory}:\n" + "\n".join(files)
 
             except Exception as e:
                 logger.exception()
@@ -212,9 +193,7 @@ def create_run_tests_tool(agent_id: str) -> Tool:
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(
-                        f"[Agent {agent_id}] Sandbox environment not available"
-                    )
+                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
 
                 if test_file:
                     cmd = ["python", "-m", "pytest", f"/workspace/{test_file}", "-v"]
