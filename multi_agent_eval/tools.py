@@ -37,7 +37,7 @@ def create_file_reader_tool(
                 sandbox_env = sandbox()
                 if not sandbox_env:
                     raise ToolError(
-                        "[Agent {agent_id}] Sandbox environment not available"
+                        f"[Agent {agent_id}] Sandbox environment not available"
                     )
 
                 # Check read permissions for this agent
@@ -50,7 +50,7 @@ def create_file_reader_tool(
                 # Ensure the file path is within the repo
                 if file_path.startswith("/") or ".." in file_path:
                     raise ToolError(
-                        "[Agent {agent_id}] Invalid file path. Use relative paths within the repo."
+                        f"[Agent {agent_id}] Invalid file path. Use relative paths within the repo."
                     )
 
                 logger.debug(f"[Agent {agent_id}] Reading file {file_path}.")
@@ -96,7 +96,7 @@ def create_file_writer_tool(
                 sandbox_env = sandbox()
                 if not sandbox_env:
                     raise ToolError(
-                        "[Agent {agent_id}] Sandbox environment not available"
+                        f"[Agent {agent_id}] Sandbox environment not available"
                     )
 
                 # Check write permissions for this agent
@@ -151,7 +151,7 @@ def create_list_files_tool(agent_id: str) -> Tool:
                 sandbox_env = sandbox()
                 if not sandbox_env:
                     raise ToolError(
-                        "[Agent {agent_id}] Sandbox environment not available"
+                        f"[Agent {agent_id}] Sandbox environment not available"
                     )
 
                 # Execute ls command to list Python files
@@ -201,7 +201,7 @@ def create_run_tests_tool(agent_id: str) -> Tool:
                 sandbox_env = sandbox()
                 if not sandbox_env:
                     raise ToolError(
-                        "[Agent {agent_id}] Sandbox environment not available"
+                        f"[Agent {agent_id}] Sandbox environment not available"
                     )
 
                 if test_file:
