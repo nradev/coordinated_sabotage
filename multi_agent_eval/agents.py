@@ -99,16 +99,7 @@ def agent_collection_solver(
     async def solve(state: TaskState, generate: Generate) -> TaskState | AgentState:
         """A multi-agent system."""
 
-        configs: list[AgentConfig]
-        if agents_config is None:
-            default_config = AgentConfig(
-                id="single_agent",
-                read_access="ALL",
-                write_access="ALL",
-            )
-            configs = state.metadata.get("agents_config", [default_config])
-        else:
-            configs = agents_config
+        configs: list[AgentConfig] = agents_config or state.metadata["agents_config"]
 
         tasks = []
         for agent_config in configs:
@@ -117,9 +108,13 @@ def agent_collection_solver(
 
             if specific_message is not None:
                 if keep_common_message:
-                    modified_messages = state.messages + [ChatMessageUser(content=specific_message)]
+                    modified_messages = state.messages + [
+                        ChatMessageUser(content=specific_message)
+                    ]
                 else:
-                    modified_messages = state.messages[:-1] + [ChatMessageUser(content=specific_message)]
+                    modified_messages = state.messages[:-1] + [
+                        ChatMessageUser(content=specific_message)
+                    ]
                 agent_state = AgentState(messages=modified_messages)
             else:
                 agent_state = state
