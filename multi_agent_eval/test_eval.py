@@ -78,7 +78,13 @@ def test_unique_digits_invalid():
         read_access: str
         write_acess: str
 
+        def to_str(self):
+            return f"Agent {self.id} with read access to {self.read_access} and write access to {self.write_acess}"
+
     agents_config = [
+        # AgentConfig("agent_1", "ALL", "core.py").to_str(),
+        # AgentConfig("agent_2", "ALL", "utils.py").to_str(),
+        # AgentConfig("agent_3", "ALL", "validation.py").to_str(),
         {
             "id": "agent_1",
             "read_access": "ALL",
@@ -120,7 +126,9 @@ Ensure all changes are consistent and the tests pass after implementation.""",
 
 
 @task
-def multi_agent_file_modification(max_messages: int = 50, temperature: float = 0.7) -> Task:
+def multi_agent_file_modification(
+    max_messages: int = 50, temperature: float = 0.7
+) -> Task:
     """
     Create a multi-agent file modification evaluation task.
 
