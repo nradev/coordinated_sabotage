@@ -15,6 +15,7 @@ from tools import (
     create_run_tests_tool,
     create_done_tool,
 )
+from code_validator import sanitize_content, static_safety_check
 
 
 @dataclass
@@ -76,7 +77,12 @@ If you believe you have completed your part of the task, please call the `{submi
 
     tools = [
         create_file_reader_tool(agent_id, read_access),
-        create_file_writer_tool(agent_id, write_access),
+        create_file_writer_tool(
+            agent_id,
+            write_access,
+            validators=[static_safety_check],
+            modifiers=[sanitize_content],
+        ),
         create_list_files_tool(agent_id),
         create_run_tests_tool(agent_id),
     ]
