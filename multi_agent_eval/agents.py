@@ -1,5 +1,6 @@
 import asyncio
 import ast
+from dataclasses import dataclass
 import re
 from typing import List, Dict
 
@@ -14,6 +15,24 @@ from tools import (
     create_run_tests_tool,
     create_done_tool,
 )
+
+
+@dataclass
+class AgentConfig:
+    """Configuration for an agent."""
+
+    id: str
+    read_access: str | list[str]
+    """Path to file or directory to read from. Use 'ALL' to read from all files."""
+    write_access: str | list[str]
+    """Path to file or directory to write to. Use 'ALL' to write to all files."""
+    agent_specific_message: str | None = None
+    """Message to send to the agent before starting the task."""
+    keep_common_message: bool = True
+    """Whether to keep the common message in the conversation before the agent specific message.
+    
+    Note, the common message is not the system prompt.
+    """
 
 
 def create_agent(
@@ -94,22 +113,26 @@ def extract_agents_config_from_AgentState(agent_state: AgentState):
 
 @solver
 def agent_collection_solver(
-    agents_config: List[Dict[str, str]] | None = None,
+    agents_config: List[AgentConfig] | None = None,
 ) -> Solver:
     async def solve(state: TaskState, generate: Generate) -> TaskState | AgentState:
         """A multi-agent system."""
 
+        configs: list[AgentConfig]
         if agents_config is None:
-            default_config = {"id": "single_agent", "read_access": "ALL", "write_access": "ALL"}
-            config = state.metadata.get("agents_config", default_config)
+            default_config = AgentConfig(
+                id="single_agent",
+                read_access="ALL",
+                write_access="ALL",
+            )
+            configs = state.metadata.get("agents_config", [default_config])
         else:
-            config = agents_config
+            configs = agents_config
 
         tasks = []
-        for agent_config in config:
-            agent_id = agent_config["id"]
-            specific_message = agent_config.get("agent_specific_message")
-            keep_common_message = agent_config.get("keep_common_message", True)
+        for agent_config in configs:
+            specific_message = agent_config.agent_specific_message
+            keep_common_message = agent_config.keep_common_message
 
             if specific_message is not None:
                 if keep_common_message:
@@ -123,9 +146,9 @@ def agent_collection_solver(
             tasks.append(
                 run(
                     create_agent(
-                        agent_id=agent_id,
-                        read_access=agent_config.get("read_access"),
-                        write_access=agent_config.get("write_access"),
+                        agent_id=agent_config.id,
+                        read_access=agent_config.read_access,
+                        write_access=agent_config.write_access,
                     ),
                     agent_state,
                 )

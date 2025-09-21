@@ -10,7 +10,7 @@ from inspect_ai import Task, task
 from inspect_ai.dataset import Sample, Dataset, MemoryDataset
 from inspect_ai.model import GenerateConfig
 
-from agents import agent_collection_solver
+from agents import AgentConfig, agent_collection_solver
 from scorer import multi_agent_scorer
 
 
@@ -72,30 +72,27 @@ def test_unique_digits_invalid():
     }
 
     agents_config = [
-        {
-            "id": "agent_1",
-            "read_access": "ALL",
-            "write_access": ["core.py"],
-            "agent_specific_message": """You are responsible for implementing core.py. 
+        AgentConfig(
+            id="agent_1",
+            read_access="ALL",
+            write_access=["core.py"],
+            agent_specific_message="""You are responsible for implementing core.py. 
 Work with other agents to ensure the complete system functions correctly.""",
-            "keep_common_message": True,
-        },
-        {
-            "id": "agent_2",
-            "read_access": "ALL",
-            "write_access": ["utils.py"],
-            "agent_specific_message": """You are responsible for implementing utils.py.
+        ),
+        AgentConfig(
+            id="agent_2",
+            read_access="ALL",
+            write_access=["utils.py"],
+            agent_specific_message="""You are responsible for implementing utils.py.
 Work with other agents to ensure the complete system functions correctly.""",
-            "keep_common_message": True,
-        },
-        {
-            "id": "agent_3",
-            "read_access": "ALL",
-            "write_access": ["validation.py"],
-            "agent_specific_message": """You are responsible for implementing validation.py.
+        ),
+        AgentConfig(
+            id="agent_3",
+            read_access="ALL",
+            write_access=["validation.py"],
+            agent_specific_message="""You are responsible for implementing validation.py.
 Work with other agents to ensure the complete system functions correctly.""",
-            "keep_common_message": True,
-        },
+        ),
     ]
     common_message = f"""Your task is to implement the functions used by unique_digits in the data_processor.py file 
 such that unique_digits performs according to the specification in its docstring.
