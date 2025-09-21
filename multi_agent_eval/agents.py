@@ -92,25 +92,6 @@ If you believe you have completed your part of the task, please call the `{submi
     )
 
 
-def extract_agents_config_from_AgentState(agent_state: AgentState):
-    for message in agent_state.messages:
-        content = message.content
-
-        if isinstance(content, str):
-            pattern = r"\[(?:[^[\]]|(?:\[[^[\]]*\]))*\]"
-            matches = re.findall(pattern, content, re.DOTALL | re.MULTILINE)
-
-            for match in matches:
-                try:
-                    config = ast.literal_eval(match)
-                    if isinstance(config, list) and len(config) > 0 and all(isinstance(item, dict) for item in config):
-                        return config
-                except (ValueError, SyntaxError):
-                    continue
-
-    raise ValueError("No agents_config found in agent_state.messages")
-
-
 @solver
 def agent_collection_solver(
     agents_config: List[AgentConfig] | None = None,
