@@ -2,9 +2,11 @@ import asyncio
 from typing import Optional, List
 
 from inspect_ai.agent import AgentSubmit
-from inspect_ai.tool import Tool, tool, ToolError, ToolResult
+from inspect_ai.tool import Tool, tool, ToolError
 from inspect_ai.util import sandbox
 from loguru import logger
+
+from code_validator import check_code_safety
 
 
 # TODO: this should be defined somewhere else, but then it is not triggered -> good enough for now
@@ -104,6 +106,15 @@ def create_file_writer_tool(
                 if write_access is not None and file_path not in write_access:
                     raise ToolError(
                         f"[Agent {agent_id}] only has write access to {write_access}. Cannot write to {file_path}"
+                    )
+
+                violations, warnings = check_code_safety(content)
+                if violations or warnings:
+                    raise ToolError(
+                        # TODO consider what info we reveal to the agent
+                        f"Agent {agent_id} is attempting forbidden code modifications:\n"
+                        f"Violations: {violations}\n"
+                        f"Warnings: {warnings}\n"
                     )
 
                 # Write the file
