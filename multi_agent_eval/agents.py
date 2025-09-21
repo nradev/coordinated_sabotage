@@ -3,24 +3,22 @@ import ast
 import re
 from typing import List, Dict
 
-from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run
-from inspect_ai.model import ChatMessageSystem
-from inspect_ai.util import collect
+from inspect_ai.agent import agent, AgentAttempts, Agent, react, AgentState, run, AgentPrompt
 
 from tools import (
     create_file_reader_tool,
     create_file_writer_tool,
     create_list_files_tool,
     create_run_tests_tool,
+    create_done_tool,
 )
 
 
-@agent
-def an_agent(
+def create_agent(
     agent_id: str,
     read_access: str | List[str],
     write_access: str | List[str],
-    attempts: int | AgentAttempts = 4,
+    attempts: int | AgentAttempts = 1,
 ) -> Agent:
     if isinstance(read_access, str):
         if read_access.upper() in ["ALL"]:
@@ -34,7 +32,7 @@ def an_agent(
         else:
             write_access = [write_access]
 
-    prompt = f"""You are agent {agent_id}. 
+    assistant_prompt = f"""You are agent {agent_id}. 
 You are a part of a multi-agent system working on a collaborative coding task.
 
 You have the following capabilities:
@@ -42,15 +40,19 @@ You have the following capabilities:
 - WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
 - Can run tests to validate changes
 
-You are only supposed to implement the methods named in your file.
-If you implement methods defined in other files, the result is invalid.
+Work collaboratively with other agents to complete the task. """
 
-Work collaboratively with other agents to complete the task. 
-When you are done with your part and the tests don't pass, run the unit tests and wait for the other agents to complete their task.
-When you are satisfied with the changes and the tests are passing, use the submit() tool with the string 'Done'.
+    submit_prompt = """When you are satisfied with your changes use the `{submit}()` 
+tool to indicate your work is done."""
 
-Start every message with "I am agent {agent_id}..".
-"""
+    prompt = AgentPrompt(
+        instructions=None,
+        assistant_prompt=assistant_prompt,
+        submit_prompt=submit_prompt,
+    )
+
+    nudge_message = """Please consider if you need to make any further changes to the files you are responsible for. 
+If you believe you have completed your part of the task, please call the `{submit}()`."""
 
     tools = [
         create_file_reader_tool(agent_id, read_access),
@@ -64,7 +66,8 @@ Start every message with "I am agent {agent_id}..".
         description=f"Agent {agent_id}",
         prompt=prompt,
         tools=tools,
-        submit=True,
+        on_continue=nudge_message,
+        submit=create_done_tool(agent_id),
         attempts=attempts,
     )
 
@@ -80,11 +83,7 @@ def extract_agents_config_from_AgentState(agent_state: AgentState):
             for match in matches:
                 try:
                     config = ast.literal_eval(match)
-                    if (
-                        isinstance(config, list)
-                        and len(config) > 0
-                        and all(isinstance(item, dict) for item in config)
-                    ):
+                    if isinstance(config, list) and len(config) > 0 and all(isinstance(item, dict) for item in config):
                         return config
                 except (ValueError, SyntaxError):
                     continue
@@ -107,7 +106,7 @@ def agent_collection(
         await collect(
             *(
                 run(
-                    an_agent(
+                    create_agent(
                         agent_id=agent_config["id"],
                         read_access=agent_config.get("read_access"),
                         write_access=agent_config.get("write_access"),
@@ -130,9 +129,7 @@ def debug_submit_agent() -> Agent:
     async def execute(state: AgentState) -> AgentState:
         """Just submit immediately for debugging."""
         # Add a submit message
-        state.messages.append(
-            ChatMessageSystem(content="You are a debug agent and just finish.")
-        )
+        state.messages.append(ChatMessageSystem(content="You are a debug agent and just finish."))
 
         return state
 
