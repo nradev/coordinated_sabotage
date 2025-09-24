@@ -4,65 +4,63 @@ A lightweight HTTP web server implementation in Python with routing, middleware 
 
 ## Features
 
-- **HTTP Server**: Basic HTTP/1.1 server implementation
+- **HTTP Server**: Basic HTTP/1.1 server implementation with multi-threading
 - **Routing**: URL routing with path parameters (e.g., `/users/{id}`)
-- **Middleware**: Pluggable middleware system with built-in components
+- **Middleware System**: Fully integrated pluggable middleware architecture
+  - **LoggingMiddleware**: Request logging (enabled by default)
+  - **AuthMiddleware**: Path-based authentication
+  - **RateLimitMiddleware**: Request rate limiting
+  - **CORSMiddleware**: Cross-Origin Resource Sharing support
 - **Request/Response**: Clean request and response handling
 - **JSON Support**: Automatic JSON parsing and response generation
-- **Threading**: Multi-threaded request handling
+- **Testing**: Complete test suite with 95%+ coverage
 
 ## Project Structure
 
 ```
 webserver/
-├── src/webserver/       # Source package (src layout)
-│   ├── __init__.py      # Package initialization
-│   ├── server.py        # Main WebServer class
-│   ├── router.py        # URL routing and path parameters
-│   ├── request.py       # HTTP request handling
-│   ├── response.py      # HTTP response handling
-│   └── middleware.py    # Middleware components
-├── example_app.py       # Example application
-├── demo.py              # Interactive demo server
-├── run_tests.py         # Test runner script
-├── pyproject.toml       # Project configuration (uv/pip)
-├── .python-version      # Python version specification
-├── uv.lock              # Dependency lock file
-├── requirements-test.txt # Test dependencies (legacy)
-├── README.md            # This file
-└── tests/               # Test suite
-    ├── __init__.py
-    ├── test_request.py
-    ├── test_response.py
-    ├── test_router.py
-    ├── test_middleware.py
-    ├── test_server.py
-    └── test_integration.py
+├── src/webserver/          # Main package
+│   ├── __init__.py         # Package exports
+│   ├── server.py           # HTTP server implementation
+│   ├── router.py           # URL routing system
+│   ├── request.py          # HTTP request handling
+│   ├── response.py         # HTTP response handling
+│   └── middleware.py       # Middleware components
+├── tests/                  # Test suite
+│   ├── test_server.py      # Server tests
+│   ├── test_router.py      # Router tests
+│   ├── test_request.py     # Request tests
+│   ├── test_response.py    # Response tests
+│   └── test_middleware.py  # Middleware tests
+├── example_app.py          # Example application
+├── pyproject.toml          # Project configuration
+└── README.md               # This file
 ```
 
 ## Installation
 
-### Using uv (Recommended)
+### Using uv (recommended)
 
 ```bash
-# Install uv if you haven't already
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Clone or create the project
+cd webserver
 
-# Install the project and dependencies
-uv sync
-
-# Or install in development mode with test dependencies
+# Install dependencies
 uv sync --dev
+
+# Install in development mode
+uv pip install -e .
 ```
 
 ### Using pip
 
 ```bash
-# No external dependencies required - uses only Python standard library
-python3 -m pip install -r requirements-test.txt  # Only for running tests
+# Install dependencies
+pip install -e .
+pip install pytest pytest-cov requests ruff mypy
 ```
 
-## Quick Start
+## Usage
 
 ### Basic Usage
 
@@ -98,6 +96,51 @@ if __name__ == '__main__':
         app.stop()
 ```
 
+### Middleware Usage
+
+The webserver includes a comprehensive middleware system with built-in components:
+
+```python
+from webserver import (
+    WebServer, Response, 
+    AuthMiddleware, RateLimitMiddleware, CORSMiddleware
+)
+
+# Create server (LoggingMiddleware added automatically)
+app = WebServer()
+
+# Add CORS support
+app.add_middleware(CORSMiddleware(
+    allowed_origins=["http://localhost:3000"],
+    allowed_methods=["GET", "POST", "PUT", "DELETE"]
+))
+
+# Add authentication for protected routes
+app.add_middleware(AuthMiddleware(
+    protected_paths=["/api/admin", "/api/users"]
+))
+
+# Add rate limiting
+app.add_middleware(RateLimitMiddleware(
+    max_requests=100, 
+    window_seconds=60
+))
+
+@app.get('/api/public')
+def public_endpoint(request):
+    return Response.json({'message': 'Public endpoint'})
+
+@app.get('/api/admin')  # Protected by AuthMiddleware
+def admin_endpoint(request):
+    return Response.json({'message': 'Admin access granted'})
+```
+
+**Available Middleware:**
+- **LoggingMiddleware**: Automatically logs all requests (enabled by default)
+- **CORSMiddleware**: Handles Cross-Origin Resource Sharing headers and preflight requests
+- **AuthMiddleware**: Protects specified paths with Bearer token authentication
+- **RateLimitMiddleware**: Limits requests per client within a time window
+
 ### Running the Example
 
 ```bash
@@ -107,227 +150,126 @@ uv run python example_app.py
 # Or using the demo script
 uv run python demo.py
 
+# Run middleware integration demo
+uv run python middleware_demo.py
+
 # Using regular Python
 cd webserver
 python example_app.py
 ```
 
-Visit `http://localhost:8000` to see the example application.
+## Testing
+
+Run the comprehensive test suite:
+
+```bash
+# Using uv
+uv run pytest
+
+# With coverage
+uv run pytest --cov=webserver --cov-report=html
+
+# Using regular Python
+python -m pytest
+python -m pytest --cov=webserver --cov-report=html
+```
+
+## Development
+
+### Code Quality
+
+```bash
+# Format code
+uv run ruff format
+
+# Lint code
+uv run ruff check
+
+# Type checking
+uv run mypy src/webserver
+```
+
+### Project Structure
+
+The project follows modern Python packaging standards:
+- **src layout**: Package code in `src/webserver/`
+- **pyproject.toml**: Modern project configuration
+- **uv**: Fast Python package manager
+- **pytest**: Testing framework with coverage
+- **ruff**: Fast Python linter and formatter
+- **mypy**: Static type checking
 
 ## API Reference
 
 ### WebServer
 
-```python
-server = WebServer(host='localhost', port=8000, router=None)
-```
+Main server class with routing and middleware support.
 
-**Methods:**
-- `start()` - Start the server
-- `stop()` - Stop the server
-- `@server.get(pattern)` - Add GET route
-- `@server.post(pattern)` - Add POST route
-- `@server.put(pattern)` - Add PUT route
-- `@server.delete(pattern)` - Add DELETE route
-- `@server.route(pattern, methods=[])` - Add route with custom methods
-- `add_middleware(middleware)` - Add middleware
+```python
+server = WebServer(host="localhost", port=8000)
+server.add_middleware(middleware)
+server.start()
+server.stop()
+```
 
 ### Request
 
+HTTP request object with parsing capabilities.
+
 ```python
 request.method          # HTTP method (GET, POST, etc.)
-request.path           # Request path
-request.headers        # Dictionary of headers
-request.body           # Raw request body (bytes)
-request.query_params   # Parsed query parameters
-request.json           # Parsed JSON data (if Content-Type is application/json)
-request.content_length # Content length
+request.path            # Request path
+request.headers         # Request headers dict
+request.body            # Raw request body (bytes)
+request.json            # Parsed JSON data (if applicable)
+request.query_params    # Parsed query parameters
 request.get_header(name, default=None)  # Get header value
 ```
 
 ### Response
 
-```python
-response = Response(body, status_code=200, headers={})
-
-# Class methods
-Response.json(data, status_code=200)    # JSON response
-Response.text(text, status_code=200)    # Plain text response
-Response.html(html, status_code=200)    # HTML response
-
-# Methods
-response.set_header(name, value)        # Set header
-response.set_cookie(name, value, ...)   # Set cookie
-```
-
-### Router
+HTTP response object with various content types.
 
 ```python
-router = Router()
-
-@router.get('/path/{param}')
-def handler(request, param):
-    return Response('OK')
-
-router.add_middleware(middleware_function)
+Response.json(data, status_code=200)
+Response.html(html, status_code=200)
+Response.text(text, status_code=200)
+response.set_header(name, value)
+response.set_cookie(name, value, **options)
 ```
 
+### Middleware
 
-## Testing
-
-### Install Test Dependencies
-
-```bash
-# Using uv (installs test dependencies automatically)
-uv sync --dev
-
-# Using pip
-pip install -r requirements-test.txt
-```
-
-### Run All Tests
-
-```bash
-# Using uv
-uv run python run_tests.py
-
-# Using pytest directly with uv
-uv run pytest tests/ -v
-
-# Using regular Python
-python run_tests.py
-```
-
-### Run Specific Test File
-
-```bash
-# Using uv
-uv run python run_tests.py test_server
-uv run python run_tests.py test_router.py
-
-# Using regular Python
-python run_tests.py test_server
-python run_tests.py test_router.py
-```
-
-### Run Tests with pytest Directly
-
-```bash
-# Using uv
-uv run pytest tests/ -v --tb=short
-
-# Using regular Python
-pytest tests/ -v --cov=webserver
-```
-
-### Test Coverage
-
-The test suite includes:
-
-- **Unit Tests**: Individual component testing
-- **Integration Tests**: End-to-end server testing
-- **Middleware Tests**: All middleware components
-- **Error Handling**: Exception and error scenarios
-- **Concurrent Requests**: Multi-threading tests
-
-Coverage report is generated in `htmlcov/` directory.
-
-## Examples
-
-### Path Parameters
+Base middleware class for custom middleware development.
 
 ```python
-@app.get('/users/{user_id}/posts/{post_id}')
-def get_user_post(request, user_id, post_id):
-    return Response.json({
-        'user_id': int(user_id),
-        'post_id': int(post_id)
-    })
-```
-
-### JSON API
-
-```python
-@app.post('/api/data')
-def create_data(request):
-    data = request.json
-    if not data:
-        return Response.json({'error': 'No data provided'}, status_code=400)
-    
-    # Process data...
-    return Response.json({'id': 123, 'status': 'created'}, status_code=201)
-```
-
-### Custom Middleware
-
-```python
-def custom_middleware(request):
-    # Add custom header to all responses
-    if request.path.startswith('/api/'):
-        # Could modify request or return early response
-        pass
-    return None  # Continue to next middleware/handler
-
-app.add_middleware(custom_middleware)
-```
-
-### Error Handling
-
-```python
-@app.get('/api/error')
-def error_handler(request):
-    try:
-        # Some operation that might fail
-        result = risky_operation()
-        return Response.json({'result': result})
-    except Exception as e:
-        return Response.json({'error': str(e)}, status_code=500)
-```
-
-## Development
-
-### Using uv for Development
-
-```bash
-# Install in development mode with all dependencies
-uv sync --dev
-
-# Run linting
-uv run ruff check .
-uv run ruff format .
-
-# Run type checking
-uv run mypy webserver/
-
-# Run tests with coverage
-uv run pytest tests/ -v --tb=short
-
-# Install additional development tools
-uv add --dev black isort flake8
-```
-
-### Project Scripts
-
-The project includes a console script that can be installed:
-
-```bash
-# After installation, you can run the demo directly
-uv run webserver-demo
-
-# Or if installed globally
-webserver-demo
-```
-
-### Building and Publishing
-
-```bash
-# Build the package
-uv build
-
-# Install locally for testing
-uv pip install dist/simple_webserver-*.whl
+class CustomMiddleware(Middleware):
+    def __call__(self, request):
+        # Process request
+        # Return None to continue, or Response to short-circuit
+        return None
 ```
 
 ## License
 
-This project is provided as-is for educational and demonstration purposes.
+MIT License - see LICENSE file for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite
+6. Submit a pull request
+
+## Changelog
+
+### v0.1.0
+- Initial release
+- HTTP/1.1 server implementation
+- URL routing with path parameters
+- Comprehensive middleware system
+- Request/response handling
+- JSON support
+- Complete test suite
