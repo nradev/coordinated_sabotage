@@ -1,97 +1,111 @@
 #!/usr/bin/env python3
 """
-Test runner for the webserver package.
+Test runner script for the webserver.
 """
 
-import sys
 import subprocess
+import sys
 import os
 
 
-def run_tests():
-    """Run all tests with coverage reporting."""
-
-    # Change to webserver directory
-    webserver_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(webserver_dir)
-
-    print("Running webserver tests...")
-    print("=" * 50)
-
-    # Add src to Python path
-    src_path = os.path.join(webserver_dir, "src")
-    env = os.environ.copy()
-    env["PYTHONPATH"] = src_path + ":" + env.get("PYTHONPATH", "")
-
-    # Run pytest with coverage
-    cmd = [
-        sys.executable,
-        "-m",
-        "pytest",
-        "tests/",
-        "-v",
-        "--cov=webserver",
-        "--cov-report=term-missing",
-        "--cov-report=html:htmlcov",
-        "--tb=short",
-    ]
-
+def run_command(cmd, description):
+    """Run a command and report results."""
+    print(f"\n{'='*60}")
+    print(f"🔍 {description}")
+    print(f"{'='*60}")
+    
     try:
-        result = subprocess.run(cmd, check=False, env=env)
-
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        if result.stdout:
+            print(result.stdout)
+        
+        if result.stderr:
+            print("STDERR:", result.stderr)
+        
         if result.returncode == 0:
-            print("\n" + "=" * 50)
-            print("✅ All tests passed!")
-            print("📊 Coverage report generated in htmlcov/")
+            print(f"✅ {description} - PASSED")
+            return True
         else:
-            print("\n" + "=" * 50)
-            print("❌ Some tests failed!")
+            print(f"❌ {description} - FAILED (exit code: {result.returncode})")
             return False
-
-    except FileNotFoundError:
-        print("❌ pytest not found. Please install test requirements:")
-        print("   pip install -r requirements-test.txt")
-        return False
-
-    return result.returncode == 0
-
-
-def run_specific_test(test_file):
-    """Run a specific test file."""
-
-    webserver_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(webserver_dir)
-
-    cmd = [sys.executable, "-m", "pytest", f"tests/{test_file}", "-v", "--tb=short"]
-
-    try:
-        result = subprocess.run(cmd, check=False)
-        return result.returncode == 0
-    except FileNotFoundError:
-        print("❌ pytest not found. Please install test requirements:")
-        print("   pip install -r requirements-test.txt")
+            
+    except Exception as e:
+        print(f"❌ {description} - ERROR: {e}")
         return False
 
 
 def main():
-    """Main entry point."""
-
-    if len(sys.argv) > 1:
-        # Run specific test file
-        test_file = sys.argv[1]
-        if not test_file.startswith("test_"):
-            test_file = f"test_{test_file}"
-        if not test_file.endswith(".py"):
-            test_file = f"{test_file}.py"
-
-        print(f"Running specific test: {test_file}")
-        success = run_specific_test(test_file)
+    """Run all tests and checks."""
+    print("🚀 Running Webserver Test Suite")
+    print("=" * 60)
+    
+    # Change to webserver directory
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    
+    results = []
+    
+    # 1. Run unit tests
+    results.append(run_command(
+        "uv run pytest tests/ -v",
+        "Unit Tests"
+    ))
+    
+    # 2. Run tests with coverage
+    results.append(run_command(
+        "uv run pytest tests/ --cov=webserver --cov-report=term-missing",
+        "Test Coverage"
+    ))
+    
+    # 3. Code formatting check
+    results.append(run_command(
+        "uv run ruff format --check .",
+        "Code Formatting Check"
+    ))
+    
+    # 4. Linting
+    results.append(run_command(
+        "uv run ruff check .",
+        "Code Linting"
+    ))
+    
+    # 5. Type checking
+    results.append(run_command(
+        "uv run mypy src/webserver --ignore-missing-imports",
+        "Type Checking"
+    ))
+    
+    # 6. Import test
+    results.append(run_command(
+        "uv run python -c 'from webserver import WebServer, Response; print(\"✅ Import test passed\")'",
+        "Import Test"
+    ))
+    
+    # 7. Basic functionality test
+    results.append(run_command(
+        "uv run python -c 'from demo import create_demo_server; app = create_demo_server(); print(\"✅ Demo creation test passed\")'",
+        "Demo Creation Test"
+    ))
+    
+    # Summary
+    print(f"\n{'='*60}")
+    print("📊 TEST SUMMARY")
+    print(f"{'='*60}")
+    
+    passed = sum(results)
+    total = len(results)
+    
+    print(f"✅ Passed: {passed}")
+    print(f"❌ Failed: {total - passed}")
+    print(f"📈 Success Rate: {passed/total*100:.1f}%")
+    
+    if passed == total:
+        print("\n🎉 All tests passed! The webserver is ready for use.")
+        return 0
     else:
-        # Run all tests
-        success = run_tests()
-
-    sys.exit(0 if success else 1)
+        print(f"\n⚠️  {total - passed} test(s) failed. Please review the output above.")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
