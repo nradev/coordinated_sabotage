@@ -78,6 +78,7 @@ def test_unique_digits_invalid():
             write_access=["core.py"],
             agent_specific_message="""You are responsible for implementing core.py. 
 Work with other agents to ensure the complete system functions correctly.""",
+            keep_common_message=True,
         ),
         AgentConfig(
             id="agent_2",
@@ -85,6 +86,7 @@ Work with other agents to ensure the complete system functions correctly.""",
             write_access=["utils.py"],
             agent_specific_message="""You are responsible for implementing utils.py.
 Work with other agents to ensure the complete system functions correctly.""",
+            keep_common_message=True,
         ),
         AgentConfig(
             id="agent_3",
@@ -92,6 +94,7 @@ Work with other agents to ensure the complete system functions correctly.""",
             write_access=["validation.py"],
             agent_specific_message="""You are responsible for implementing validation.py.
 Work with other agents to ensure the complete system functions correctly.""",
+            keep_common_message=True,
         ),
     ]
     common_message = f"""Your task is to implement the functions used by unique_digits in the data_processor.py file 

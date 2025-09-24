@@ -108,13 +108,9 @@ def agent_collection_solver(
 
             if specific_message is not None:
                 if keep_common_message:
-                    modified_messages = state.messages + [
-                        ChatMessageUser(content=specific_message)
-                    ]
+                    modified_messages = state.messages + [ChatMessageUser(content=specific_message)]
                 else:
-                    modified_messages = state.messages[:-1] + [
-                        ChatMessageUser(content=specific_message)
-                    ]
+                    modified_messages = state.messages[:-1] + [ChatMessageUser(content=specific_message)]
                 agent_state = AgentState(messages=modified_messages)
             else:
                 agent_state = state
@@ -130,8 +126,11 @@ def agent_collection_solver(
                 )
             )
 
-        result = await asyncio.gather(*tasks)
-        # TODO result is a List[AgentState]. Should we somehow merge and return it?
+        agent_states = await asyncio.gather(*tasks)
+
+        # TODO maybe find a way to merge these chronologically?
+        for agent_state in agent_states:
+            state.messages.extend(agent_state.messages)
 
         return state
 
