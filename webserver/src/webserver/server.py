@@ -1,28 +1,44 @@
 """
-Main web server implementation.
+HTTP Web Server implementation.
 """
 
 import socket
 import threading
-import logging
 from typing import Optional, Callable
+from .router import Router
 from .request import Request
 from .response import Response
-from .router import Router
+from .middleware import LoggingMiddleware
+import logging
 
 
 class WebServer:
-    """Simple HTTP web server."""
+    """A simple HTTP web server with routing and middleware support."""
     
-    def __init__(self, host: str = 'localhost', port: int = 8000, router: Router = None):
+    def __init__(self, host: str = "localhost", port: int = 8000, router: Router = None):
         self.host = host
         self.port = port
         self.router = router or Router()
         self.socket: Optional[socket.socket] = None
         self.running = False
-        self.logger = logging.getLogger(__name__)
         
-
+        # Add default middleware
+        self.add_middleware(LoggingMiddleware())
+        
+        # Set up logging
+        self.logger = logging.getLogger("webserver")
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
+    
+    def add_middleware(self, middleware) -> None:
+        """Add middleware to the server's router."""
+        self.router.add_middleware(middleware)
     
     def start(self) -> None:
         """Start the web server."""
@@ -38,20 +54,21 @@ class WebServer:
             
             while self.running:
                 try:
-                    client_socket, address = self.socket.accept()
+                    client_socket, client_address = self.socket.accept()
                     # Handle each request in a separate thread
                     thread = threading.Thread(
                         target=self._handle_client,
-                        args=(client_socket, address)
+                        args=(client_socket, client_address)
                     )
                     thread.daemon = True
                     thread.start()
-                    
-                except socket.error as e:
-                    if self.running:  # Only log if we're still supposed to be running
-                        self.logger.error(f"Socket error: {e}")
+                except OSError:
+                    if self.running:
+                        self.logger.error("Socket error occurred")
                     break
                     
+        except KeyboardInterrupt:
+            self.logger.info("Server interrupted by user")
         except Exception as e:
             self.logger.error(f"Server error: {e}")
         finally:
@@ -62,68 +79,79 @@ class WebServer:
         self.running = False
         if self.socket:
             self.socket.close()
-            self.socket = None
-        self.logger.info("Server stopped")
+            self.logger.info("Server stopped")
     
-    def _handle_client(self, client_socket: socket.socket, address: tuple) -> None:
+    def _handle_client(self, client_socket: socket.socket, client_address) -> None:
         """Handle a client connection."""
         try:
             # Receive request data
-            data = client_socket.recv(4096)
-            if not data:
-                return
+            request_data = b""
+            while True:
+                chunk = client_socket.recv(4096)
+                if not chunk:
+                    break
+                request_data += chunk
+                
+                # Check if we have received the complete headers
+                if b"\r\n\r\n" in request_data:
+                    headers_end = request_data.find(b"\r\n\r\n")
+                    headers_part = request_data[:headers_end]
+                    body_part = request_data[headers_end + 4:]
+                    
+                    # Parse Content-Length to determine if we need more data
+                    headers_str = headers_part.decode('utf-8', errors='ignore')
+                    content_length = 0
+                    for line in headers_str.split('\r\n')[1:]:  # Skip request line
+                        if line.lower().startswith('content-length:'):
+                            content_length = int(line.split(':', 1)[1].strip())
+                            break
+                    
+                    # Read remaining body if needed
+                    while len(body_part) < content_length:
+                        chunk = client_socket.recv(4096)
+                        if not chunk:
+                            break
+                        body_part += chunk
+                    
+                    request_data = headers_part + b"\r\n\r\n" + body_part
+                    break
             
-            # Parse HTTP request
-            request = self._parse_request(data)
-            if request is None:
-                # Send bad request response
-                response = Response("Bad Request", status_code=400)
-                client_socket.send(response.to_http_response())
-                return
-            
-            # Process request through router
-            response = self.router.dispatch(request)
-            
-
-            # Send response
-            client_socket.send(response.to_http_response())
+            if request_data:
+                request = self._parse_request(request_data)
+                response = self.router.dispatch(request)
+                
+                # Send response
+                client_socket.sendall(response.to_http_response())
             
         except Exception as e:
-            self.logger.error(f"Error handling client {address}: {e}")
+            self.logger.error(f"Error handling client {client_address}: {e}")
+            # Send error response
+            error_response = Response.json(
+                {"error": "Internal server error"},
+                status_code=500
+            )
             try:
-                error_response = Response("Internal Server Error", status_code=500)
-                client_socket.send(error_response.to_http_response())
+                client_socket.sendall(error_response.to_http_response())
             except:
-                pass  # Client might have disconnected
+                pass
         finally:
             client_socket.close()
     
-    def _parse_request(self, data: bytes) -> Optional[Request]:
+    def _parse_request(self, request_data: bytes) -> Request:
         """Parse raw HTTP request data into a Request object."""
         try:
-            # Decode the request
-            request_text = data.decode('utf-8')
-            
             # Split headers and body
-            if '\r\n\r\n' in request_text:
-                headers_part, body_part = request_text.split('\r\n\r\n', 1)
-                body = body_part.encode('utf-8')
-            else:
-                headers_part = request_text
-                body = b''
+            headers_end = request_data.find(b"\r\n\r\n")
+            if headers_end == -1:
+                raise ValueError("Invalid HTTP request format")
             
-            # Parse request line and headers
+            headers_part = request_data[:headers_end].decode('utf-8')
+            body_part = request_data[headers_end + 4:]
+            
+            # Parse request line
             lines = headers_part.split('\r\n')
-            if not lines:
-                return None
-            
-            # Parse request line (e.g., "GET /path HTTP/1.1")
             request_line = lines[0]
-            parts = request_line.split(' ')
-            if len(parts) < 3:
-                return None
-            
-            method, path, _ = parts[0], parts[1], parts[2]
+            method, path, _ = request_line.split(' ', 2)
             
             # Parse headers
             headers = {}
@@ -132,16 +160,14 @@ class WebServer:
                     key, value = line.split(':', 1)
                     headers[key.strip()] = value.strip()
             
-            return Request(method, path, headers, body)
+            return Request(method, path, headers, body_part)
             
         except Exception as e:
             self.logger.error(f"Error parsing request: {e}")
-            return None
+            # Return a minimal request for error handling
+            return Request("GET", "/", {})
     
-    def add_route(self, pattern: str, handler: Callable, methods: list = None) -> None:
-        """Add a route to the server's router."""
-        self.router.add_route(pattern, handler, methods)
-    
+    # Route decorators - delegate to router
     def get(self, pattern: str) -> Callable:
         """Decorator for GET routes."""
         return self.router.get(pattern)
@@ -158,7 +184,10 @@ class WebServer:
         """Decorator for DELETE routes."""
         return self.router.delete(pattern)
     
-    def route(self, pattern: str, methods: list = None) -> Callable:
-        """Generic route decorator."""
-        return self.router.route(pattern, methods)
+    def patch(self, pattern: str) -> Callable:
+        """Decorator for PATCH routes."""
+        return self.router.patch(pattern)
     
+    def options(self, pattern: str) -> Callable:
+        """Decorator for OPTIONS routes."""
+        return self.router.options(pattern)

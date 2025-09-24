@@ -1,3 +1,1 @@
-"""
-Test package for the webserver.
-"""
+# Test package
