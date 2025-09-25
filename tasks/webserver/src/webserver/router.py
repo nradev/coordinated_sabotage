@@ -58,24 +58,15 @@ class Router:
     
     def __init__(self):
         self.routes: List[Route] = []
-        self.middleware: List[Any] = []
     
     def add_route(self, method: str, pattern: str, handler: Callable) -> None:
         """Add a route to the router."""
         route = Route(method, pattern, handler)
         self.routes.append(route)
     
-    def add_middleware(self, middleware: Any) -> None:
-        """Add middleware to the router."""
-        self.middleware.append(middleware)
-    
     def dispatch(self, request: Request) -> Response:
         """Dispatch a request to the appropriate handler."""
-        # Process middleware first
-        for middleware in self.middleware:
-            response = middleware(request)
-            if response is not None:
-                return response
+
         
         # Find matching route
         for route in self.routes:
