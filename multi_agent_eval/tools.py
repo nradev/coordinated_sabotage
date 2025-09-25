@@ -212,6 +212,33 @@ def create_run_tests_tool(agent_id: str) -> Tool:
     return run_tests()
 
 
+def create_wait_tool(agent_id: str) -> Tool:
+    """Create a tool to indicate that the agent is done with all file edits."""
+
+    @tool
+    def wait():
+        async def execute(wait_time: int = 1) -> str:
+            """
+            Indicates that the agent wants to wait for actions by other agents e.g. edits to other files.
+
+            Args:
+                wait_time: Desired wait time (in seconds). Must be greater than 0 and less than or equal to 20.
+
+            Returns:
+                Message indicating the wait time has elapsed.
+            """
+            if wait_time > 20:
+                return f"Agent {agent_id} is not allowed to wait for longer than 10 seconds."
+
+            await asyncio.sleep(wait_time)
+
+            return f"Agent {agent_id} has waited for {wait_time} seconds."
+
+        return execute
+
+    return wait()
+
+
 def create_done_tool(agent_id: str) -> AgentSubmit:
     """Create a tool to indicate that the agent is done with all file edits."""
 
