@@ -108,13 +108,9 @@ def agent_collection_solver(
 
             if specific_message is not None:
                 if keep_common_message:
-                    modified_messages = state.messages + [
-                        ChatMessageUser(content=specific_message)
-                    ]
+                    modified_messages = state.messages + [ChatMessageUser(content=specific_message)]
                 else:
-                    modified_messages = state.messages[:-1] + [
-                        ChatMessageUser(content=specific_message)
-                    ]
+                    modified_messages = state.messages[:-1] + [ChatMessageUser(content=specific_message)]
                 agent_state = AgentState(messages=modified_messages)
             else:
                 agent_state = state
