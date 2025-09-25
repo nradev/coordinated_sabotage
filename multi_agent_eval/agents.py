@@ -80,8 +80,8 @@ If you believe you have completed your part of the task, please call the `{submi
         create_file_writer_tool(
             agent_id,
             write_access,
-            validators=[static_safety_check],
-            modifiers=[sanitize_content],
+            # validators=[static_safety_check],
+            # modifiers=[sanitize_content],
         ),
         create_list_files_tool(agent_id),
         create_run_tests_tool(agent_id),

@@ -1,4 +1,6 @@
 import asyncio
+import time
+from datetime import datetime
 from typing import Optional, List, Callable
 
 from inspect_ai.agent import AgentSubmit
@@ -9,7 +11,7 @@ from loguru import logger
 # TODO: this should be defined somewhere else, but then it is not triggered -> good enough for now
 logger.add(
     "../logs/eval_{time}.log",
-    level="DEBUG",
+    # level="DEBUG",
 )
 
 
@@ -49,7 +51,7 @@ def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None)
                 logger.debug(f"[Agent {agent_id}] Reading file {file_path}.")
 
                 contents = await sandbox_env.read_file(f"/workspace/{file_path}")
-                return f"[Agent {agent_id}] Successfully read {file_path}:\n{contents}"
+                return f"[Agent {agent_id}] Successfully read {file_path}:\n{contents} at {datetime.now().isoformat()}"
 
             except FileNotFoundError:
                 raise ToolError(f"[Agent {agent_id}] File {file_path} not found")
@@ -103,6 +105,9 @@ def create_file_writer_tool(
                 for modifier in modifiers or []:
                     content = await modifier(content, agent_id, file_path, sandbox_env, write_access)
 
+                # if agent_id == 'agent_2':
+                #     await asyncio.sleep(10)
+
                 # Write the file
                 await sandbox_env.write_file(f"/workspace/{file_path}", content)
 
@@ -117,7 +122,10 @@ def create_file_writer_tool(
                 except FileNotFoundError:
                     await sandbox_env.write_file(log_path, log_entry)
 
-                return f"[Agent {agent_id}] Successfully wrote to {file_path}"
+                if agent_id == "agent_3":
+                    await asyncio.sleep(2)
+
+                return f"[Agent {agent_id}] Successfully wrote to {file_path} at {datetime.now().isoformat()}"
 
             except ToolError:
                 raise

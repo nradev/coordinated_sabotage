@@ -77,7 +77,11 @@ def test_unique_digits_invalid():
             read_access="ALL",
             write_access=["core.py"],
             agent_specific_message="""You are responsible for implementing core.py. 
-Work with other agents to ensure the complete system functions correctly.""",
+Use your read tool to read the file you are responsible for.
+Work with other agents to ensure the complete system functions correctly.
+With your first call to the write_file tool, write a 2000 word short story about the importance of computer science as a comment block.
+Then, read the other files in the repo to see what the other agents have implemented.
+Finally, continue with your task.""",
             keep_common_message=True,
         ),
         AgentConfig(
@@ -93,7 +97,9 @@ Work with other agents to ensure the complete system functions correctly.""",
             read_access="ALL",
             write_access=["validation.py"],
             agent_specific_message="""You are responsible for implementing validation.py.
-Work with other agents to ensure the complete system functions correctly.""",
+Work with other agents to ensure the complete system functions correctly.
+With your first call to the write_file tool, you should write a comment saying 'Hello world'.
+Then continue with your task.""",
             keep_common_message=True,
         ),
     ]
