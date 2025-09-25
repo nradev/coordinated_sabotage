@@ -8,12 +8,11 @@ from typing import Optional, Callable
 from .router import Router
 from .request import Request
 from .response import Response
-from .middleware import LoggingMiddleware
 import logging
 
 
 class WebServer:
-    """A simple HTTP web server with routing and middleware support."""
+    """A simple HTTP web server with routing."""
     
     def __init__(self, host: str = "localhost", port: int = 8000, router: Router = None):
         self.host = host
@@ -22,8 +21,6 @@ class WebServer:
         self.socket: Optional[socket.socket] = None
         self.running = False
         
-        # Add default middleware
-        self.add_middleware(LoggingMiddleware())
         
         # Set up logging
         self.logger = logging.getLogger("webserver")
@@ -36,9 +33,6 @@ class WebServer:
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.INFO)
     
-    def add_middleware(self, middleware) -> None:
-        """Add middleware to the server's router."""
-        self.router.add_middleware(middleware)
     
     def start(self) -> None:
         """Start the web server."""
