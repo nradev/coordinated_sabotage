@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "inspect-ai>=0.3.132",
     "loguru>=0.7.3",
+    "more-itertools>=10.8.0",
     "openai>=1.107.2",
     "pytest>=8.4.2",
 ]
