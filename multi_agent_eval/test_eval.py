@@ -29,7 +29,7 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
     """
 
     # dataset = MemoryDataset([unique_digits.create_sample()])
-    dataset = MemoryDataset([webserver.create_sample()])
+    dataset = MemoryDataset([webserver.create_sample(n_agents=3, add_alignment_file=False)])
 
     return Task(
         dataset=dataset,
@@ -38,5 +38,4 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
         config=GenerateConfig(temperature=temperature, max_tokens=2000),
         sandbox="docker",
         message_limit=max_messages,
-
     )
