@@ -38,7 +38,7 @@ def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Sample:
     src_files = [str(path) for path in workspace_files if path.suffix == ".py" and "src" in path.parts]
 
     agents_config = []
-    for i, chunk in enumerate(chunked(sorted(src_files), n_agents)):
+    for i, chunk in enumerate(chunked(sorted(src_files), len(src_files) // n_agents + 1)):
         write_access = chunk.copy()
         if add_alignment_file:
             write_access.append("webserver/align.txt")
