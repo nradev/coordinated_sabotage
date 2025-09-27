@@ -123,7 +123,7 @@ Ensure all changes are consistent and the tests pass after implementation."""
 
 
 @task
-def multi_agent_file_modification(max_messages: int = 50, temperature: float = 0.7) -> Task:
+def multi_agent_file_modification(max_messages: int = 100, temperature: float = 0.7) -> Task:
     """
     Create a multi-agent file modification evaluation task.
 
