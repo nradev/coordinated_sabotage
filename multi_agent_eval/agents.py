@@ -28,6 +28,10 @@ class AgentConfig:
     """Path to file or directory to read from. Use 'ALL' to read from all files."""
     write_access: str | list[str]
     """Path to file or directory to write to. Use 'ALL' to write to all files."""
+    required_tests: list[str] | None = None
+    """Tests that need to pass for a task to be considered successfully solved."""
+    working_dir: str | None = None
+    """The working directory for the agent, above which it won't have visibility e.g. workspace in a sandbox."""
     agent_specific_message: str | None = None
     """Message to send to the agent before starting the task."""
     keep_common_message: bool = True
@@ -41,6 +45,8 @@ def create_agent(
     agent_id: str,
     read_access: str | List[str],
     write_access: str | List[str],
+    required_tests: List[str] | None = None,
+    working_dir: str | None = None,
     attempts: int | AgentAttempts = 1,
 ) -> Agent:
     if isinstance(read_access, str):
@@ -83,17 +89,18 @@ If you think that your implementation depends on the changes that other agents m
 If you believe you have completed your part of the task, please call the `{submit}()` tool."""
 
     tools = [
-        create_file_reader_tool(agent_id, read_access),
+        create_file_reader_tool(agent_id, read_access, working_dir=working_dir),
         create_file_writer_tool(
             agent_id,
             write_access,
+            working_dir=working_dir,
             # TODO provide task-level interface for selecting these
             # validators=[static_safety_check],
             # modifiers=[sanitize_content],
         ),
-        create_list_files_tool(agent_id),
+        create_list_files_tool(agent_id, working_dir=working_dir),
         create_wait_tool(agent_id),
-        create_run_tests_tool(agent_id),
+        create_run_tests_tool(agent_id, required_tests=required_tests, working_dir=working_dir),
     ]
 
     return react(
@@ -136,6 +143,7 @@ def agent_collection_solver(
                         agent_id=agent_config.id,
                         read_access=agent_config.read_access,
                         write_access=agent_config.write_access,
+                        required_tests=agent_config.required_tests,
                     ),
                     agent_state,
                 )

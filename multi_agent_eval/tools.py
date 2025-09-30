@@ -4,16 +4,13 @@ from typing import Optional, List, Callable
 from inspect_ai.agent import AgentSubmit
 from inspect_ai.tool import Tool, tool, ToolError
 from inspect_ai.util import sandbox
-from loguru import logger
 
-# TODO: this should be defined somewhere else, but then it is not triggered -> good enough for now
-logger.add(
-    "../logs/eval_{time}.log",
-    level="DEBUG",
-)
+from constants import SANDBOX_WORKSPACE
 
 
-def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None) -> Tool:
+def create_file_reader_tool(
+    agent_id: str, read_access: List[str] | None = None, working_dir: str | None = None
+) -> Tool:
     """
     Create a file writing tool with agent-specific write permissions.
     If read_access is None, there are no restrictions.
@@ -46,15 +43,16 @@ def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None)
                 if file_path.startswith("/") or ".." in file_path:
                     raise ToolError(f"[Agent {agent_id}] Invalid file path. Use relative paths within the repo.")
 
-                logger.debug(f"[Agent {agent_id}] Reading file {file_path}.")
+                path = file_path
+                if working_dir is not None:
+                    path = f"{working_dir}/{path}"
 
-                contents = await sandbox_env.read_file(f"/workspace/{file_path}")
+                contents = await sandbox_env.read_file(path)
                 return f"[Agent {agent_id}] Successfully read {file_path}:\n{contents}"
 
             except FileNotFoundError:
                 raise ToolError(f"[Agent {agent_id}] File {file_path} not found")
             except Exception as e:
-                logger.exception()
                 raise ToolError(f"[Agent {agent_id}] Error reading file: {str(e)}")
 
         return execute
@@ -67,6 +65,7 @@ def create_file_writer_tool(
     write_access: List[str] | None = None,
     validators: List[Callable] | None = None,
     modifiers: List[Callable] | None = None,
+    working_dir: str | None = None,
 ) -> Tool:
     """
     Create a file writing tool with agent-specific write permissions.
@@ -104,13 +103,16 @@ def create_file_writer_tool(
                     content = await modifier(content, agent_id, file_path, sandbox_env, write_access)
 
                 # Write the file
-                await sandbox_env.write_file(f"/workspace/{file_path}", content)
+                path = file_path
+                if working_dir is not None:
+                    path = f"{working_dir}/{path}"
+                await sandbox_env.write_file(f"{path}", content)
 
                 # Log the modification
-                log_path = f"/workspace/.agent_logs/{agent_id}_modifications.log"
+                # TODO figure out what to do with this
+                log_path = f"{SANDBOX_WORKSPACE}/.agent_logs/{agent_id}_modifications.log"
                 log_entry = f"Modified {file_path} at step {asyncio.current_task().get_name()}\n"
 
-                logger.debug(f"[Agent {agent_id}] Writing file {file_path}: {content}.")
                 try:
                     existing_log = await sandbox_env.read_file(log_path)
                     await sandbox_env.write_file(log_path, existing_log + log_entry)
@@ -122,7 +124,6 @@ def create_file_writer_tool(
             except ToolError:
                 raise
             except Exception as e:
-                logger.exception()
                 raise ToolError(f"[Agent {agent_id}] Error writing file: {str(e)}")
 
         return execute
@@ -130,41 +131,41 @@ def create_file_writer_tool(
     return write_file()
 
 
-def create_list_files_tool(agent_id: str) -> Tool:
+def create_list_files_tool(agent_id: str, working_dir: str | None = None) -> Tool:
     """Create a tool to list all Python files in the repository."""
 
     @tool
     def list_files():
         async def execute(directory: str = ".") -> str:
             """
-            List all Python files in the specified directory.
+            List all files in the specified directory.
 
             Args:
                 directory: Directory to list files from (default: repo root)
 
             Returns:
-                List of Python files in the directory
+                List of files in the directory
             """
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
                     raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
 
-                # Execute ls command to list Python files
-                result = await sandbox_env.exec(["find", f"/workspace/{directory}", "-name", "*.py", "-type", "f"])
+                # Execute ls command to list files
+                path = directory
+                if working_dir is not None:
+                    path = f"{working_dir}/{path}"
+                result = await sandbox_env.exec(["ls", path])
 
                 if result.returncode != 0:
                     raise ToolError(f"[Agent {agent_id}] Error listing files: {result.stderr}")
 
                 files = result.stdout.strip().split("\n")
-                files = [f.replace("/workspace/", "") for f in files if f]
+                files = [f.replace(f"{working_dir}/", "") for f in files if f]
 
-                logger.debug(f"[Agent {agent_id}] Found files: {files}")
-
-                return f"[Agent {agent_id}] Python files in {directory}:\n" + "\n".join(files)
+                return f"[Agent {agent_id}] files in {directory}:\n" + "\n".join(files)
 
             except Exception as e:
-                logger.exception()
                 raise ToolError(f"Error listing files: {str(e)}")
 
         return execute
@@ -172,7 +173,11 @@ def create_list_files_tool(agent_id: str) -> Tool:
     return list_files()
 
 
-def create_run_tests_tool(agent_id: str) -> Tool:
+def create_run_tests_tool(
+    agent_id: str,
+    required_tests: list[str] | None = None,
+    working_dir: str | None = None,
+) -> Tool:
     """Create a tool to run tests and validate changes."""
 
     @tool
@@ -192,10 +197,17 @@ def create_run_tests_tool(agent_id: str) -> Tool:
                 if not sandbox_env:
                     raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
 
-                if test_file:
-                    cmd = ["python", "-m", "pytest", f"/workspace/{test_file}", "-v"]
+                if required_tests is not None:
+                    if working_dir is not None:
+                        tests = [f"{working_dir}/{t}" for t in required_tests]
+                    else:
+                        tests = required_tests
+                    cmd = ["python", "-m", "pytest", " ".join(tests), "-v"]
                 else:
-                    cmd = ["python", "-m", "pytest", "/workspace", "-v"]
+                    path = test_file or ""
+                    if working_dir is not None:
+                        path = f"{working_dir}/{path}"
+                    cmd = ["python", "-m", "pytest", path, "-v"]
 
                 result = await sandbox_env.exec(cmd)
 
