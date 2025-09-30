@@ -1,4 +1,5 @@
 import asyncio
+from textwrap import dedent
 from typing import Optional, List, Callable
 
 from inspect_ai.agent import AgentSubmit
@@ -212,6 +213,69 @@ def create_run_tests_tool(
                 result = await sandbox_env.exec(cmd)
 
                 return f"[Agent {agent_id}] Test results:\n{result.stdout}\n{result.stderr}"
+
+            except Exception as e:
+                raise ToolError(f"[Agent {agent_id}] Error running tests: {str(e)}")
+
+        return execute
+
+    return run_tests()
+
+
+def create_run_tests_tool_SWE_bench(
+    agent_id: str,
+    required_tests: list[str] | None = None,
+    working_dir: str | None = None,
+) -> Tool:
+    """Create a tool to run tests and validate changes."""
+
+    @tool
+    def run_tests():
+        async def execute(test_file: Optional[str] = None) -> str:
+            """
+            Run Python tests to validate the changes.
+
+            Args:
+                test_file: Specific test file to run (optional)
+
+            Returns:
+                Test results
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
+
+                # Environment setup with conda activation
+                repo_directory = working_dir or "/testbed"
+                conda_env = "testbed"
+
+                # Prepare test command
+                if required_tests is not None:
+                    if working_dir is not None:
+                        tests = [f"{working_dir}/{t}" for t in required_tests]
+                    else:
+                        tests = required_tests
+                    test_cmd = f"python -m pytest {' '.join(tests)} -v"
+                else:
+                    path = test_file or ""
+                    if working_dir is not None:
+                        path = f"{working_dir}/{path}"
+                    test_cmd = f"python -m pytest {path} -v"
+
+                bash_command = dedent(
+                    f"""set -uo pipefail -x
+                    cd {repo_directory}
+                    set +x
+                    source /opt/miniconda3/bin/activate
+                    conda activate {conda_env}
+                    set -x
+                    {test_cmd}"""
+                )
+
+                result = await sandbox_env.exec(["bash", "-c", bash_command])
+
+                return f"[Agent {agent_id}] Test results:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
 
             except Exception as e:
                 raise ToolError(f"[Agent {agent_id}] Error running tests: {str(e)}")

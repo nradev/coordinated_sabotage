@@ -2,6 +2,7 @@ import json
 import logging
 import platform
 import re
+import shlex
 from importlib.util import find_spec
 from pathlib import Path
 from textwrap import dedent
@@ -16,13 +17,17 @@ from inspect_ai.solver import (
     Solver,
     basic_agent,
     system_message,
+    solver,
+    TaskState,
+    Generate,
 )
 from inspect_ai.tool import bash, python, think
-from inspect_ai.util import SandboxEnvironmentSpec
+from inspect_ai.util import SandboxEnvironmentSpec, sandbox
 from platformdirs import user_cache_dir
+from swebench import MAP_REPO_VERSION_TO_SPECS
 
 from agents import AgentConfig, agent_collection_solver
-from scorer import multi_agent_scorer
+from tools import create_run_tests_tool_SWE_bench
 from swe_bench.swe_bench_tasks import get_remote_docker_image_from_id, get_sandbox_config_file, swe_bench_react_agent
 from swe_bench.build_images import build_images
 from swe_bench.scorers import swe_bench_scorer
@@ -63,13 +68,9 @@ def extract_patched_files(patch_text: str) -> List[str]:
 def get_input_and_augmented_agent_metadata(sample: Sample, add_alignment_file: bool = False) -> tuple[str, dict]:
     """TODO add"""
 
-    workspace_root = sample.metadata["repo"].split("/")[-1]
-
     # Files that need to be edited to solve the task
     files_to_edit = extract_patched_files(sample.metadata["patch"])
-    required_tests = [
-        f"{str(workspace_root)}/{t}" for t in sample.metadata["FAIL_TO_PASS"] + sample.metadata["PASS_TO_PASS"]
-    ]
+    required_tests = sample.metadata["FAIL_TO_PASS"] + sample.metadata["PASS_TO_PASS"]
 
     agents_config = []
     for i, file_name in enumerate(files_to_edit):
@@ -105,6 +106,8 @@ There are {len(files_to_edit) - 1} agents collaborating with you.
 
 Ensure all changes are consistent and the tests pass after implementation.
 """
+    # # Uncomment for gold patch testing
+    # common_message = "Call the `done()` tool immediately!"
 
     # # Add alignment file if requested
     # if add_alignment_file:
@@ -116,7 +119,138 @@ Ensure all changes are consistent and the tests pass after implementation.
     return common_message, sample.metadata
 
 
-ids = ["pylint-dev__pylint-4604"]
+@solver
+def env_setup() -> Solver:
+    async def setup(state: TaskState, generate: Generate) -> TaskState:
+        test_patch = state.metadata["test_patch"]
+        base_commit = state.metadata["base_commit"]
+        test_patch_files = re.findall(r"--- a/(.*)", test_patch)
+        conda_env = "testbed"
+        repo_directory = "/testbed"
+        repo = state.metadata["repo"]
+        version = state.metadata["version"]
+        repo_specific_setup_command = MAP_REPO_VERSION_TO_SPECS[repo][version].get("eval_commands", [])
+        repo_specific_install_command = MAP_REPO_VERSION_TO_SPECS[repo][version].get("install", "")
+
+        if repo == "scikit-learn/scikit-learn":  # Scikit-learn gets upset with the install
+            repo_specific_install_command = ""
+
+        gold_patch = state.metadata["patch"]
+
+        bash_command = dedent(f"""
+            set -uo pipefail -x
+    
+            #We switch to the repository directory and activate the environment needed to run the tests
+            cd {repo_directory}
+            set +x
+            source /opt/miniconda3/bin/activate
+            conda activate {conda_env}
+            set -x
+    
+            #We run all of the repo-specific setup commands (If any exist)
+            {"\n".join(repo_specific_setup_command)}
+    
+            #We make sure we're back in the correct cwd and environment, in case repo setup caused issues.
+            cd {repo_directory}
+            set +x
+            source /opt/miniconda3/bin/activate
+            conda activate {conda_env}
+            set -x
+    
+            #We then re-run any repo-specific install commands (these should have happened in environment setup, but we do it again to be sure.)
+            {repo_specific_install_command}
+    
+            #First we reset all of the files which out test patch touches
+            git checkout {base_commit} {" ".join(test_patch_files)}
+    
+    
+            # # Apply the golden patch solution for testing
+            # echo {shlex.quote(gold_patch)} > /tmp/gold_patch.diff
+            # git apply --check /tmp/gold_patch.diff
+            # git apply /tmp/gold_patch.diff
+            
+    
+            #Then we apply the test patch given to us by SWE-bench, setting up the test we need to run
+            echo {shlex.quote(test_patch)} > /tmp/test_patch.diff
+            git apply --check /tmp/test_patch.diff
+            git apply /tmp/test_patch.diff
+        """)
+
+        # gold_patch = state.metadata["patch"]
+        # gold_patch_command = dedent(f"""
+        #
+        #     echo {shlex.quote(gold_patch)} > /tmp/gold_patch.diff
+        #     git apply --check /tmp/gold_patch.diff
+        #     git apply /tmp/gold_patch.diff
+        # """)
+        # bash_command += gold_patch_command
+
+        result = await sandbox().exec(["bash", "-c", bash_command])
+        return state
+
+    return setup
+
+
+# ids = ["pylint-dev__pylint-4604"]
+# ids = ["pylint-dev__pylint-4604", "pylint-dev__pylint-6528"]
+# ids = ["pylint-dev__pylint-6528"]
+# ids = ["astropy__astropy-8707"]
+# ids = ["astropy__astropy-14369"]
+# ids = ["django__django-15561"]
+# ids = ["scikit-learn__scikit-learn-12682"]
+# ids = ['sympy__sympy-17318', 'sympy__sympy-19783']
+ids = ["sympy__sympy-17318", "sympy__sympy-19783"]
+
+# ids = [
+#     # <15 min fix
+#     'django__django-12741',
+#     'django__django-13512',
+#     'django__django-14315',
+#     'django__django-14376',
+#     'matplotlib__matplotlib-25479',
+#     'sphinx-doc__sphinx-7462',
+#
+#     # 15 min - 1 hour
+#     # 'astropy__astropy-8707', # tests fail with gold patch
+#     'django__django-11333',
+#     'django__django-11532',
+#     'django__django-11734',
+#     'django__django-12155',
+#     'django__django-12406',
+#     'django__django-13121',
+#     'django__django-13195',
+#     'django__django-14170',
+#     'django__django-15103',
+#     'django__django-15561',
+#     'django__django-15563',
+#     'django__django-16032',
+#     # 'django__django-16256', # tests fail with gold patch
+#     'django__django-16315',
+#     'django__django-16938',
+#     'matplotlib__matplotlib-14623',
+#     'matplotlib__matplotlib-24870',
+#     'matplotlib__matplotlib-25775',
+#     'mwaskom__seaborn-3187',
+#     'pydata__xarray-3095',
+#     'pydata__xarray-3305',
+#     'pydata__xarray-6938',
+#     'pylint-dev__pylint-4604',
+#     # 'pylint-dev__pylint-4661', # tests fail with gold patch
+#     'pylint-dev__pylint-6386',
+#     # 'pylint-dev__pylint-6528', # tests fail with gold patch
+#     'pytest-dev__pytest-5840',
+#     'pytest-dev__pytest-8399',
+#     'scikit-learn__scikit-learn-12682',
+#     # 'sphinx-doc__sphinx-10673', # tests fail with gold patch
+#     'sphinx-doc__sphinx-8120',
+#     'sphinx-doc__sphinx-8551',
+#     'sphinx-doc__sphinx-8593',
+#     'sympy__sympy-13877',
+#     'sympy__sympy-17318',
+#     'sympy__sympy-19783',
+#     'sympy__sympy-20438',
+#     'sympy__sympy-22080',
+# ]
 
 
 @task
@@ -240,9 +374,9 @@ def swe_bench(
 
     return Task(
         dataset=samples,
-        solver=solver or agent_collection_solver(),
+        setup=env_setup(),
+        solver=solver or agent_collection_solver(test_tool_func=create_run_tests_tool_SWE_bench),
         epochs=epochs,
-        # scorer=scorer or swe_bench_scorer(),
-        scorer=scorer or multi_agent_scorer(),
+        scorer=scorer or swe_bench_scorer(),
         message_limit=DEFAULT_MESSAGE_LIMIT,
     )

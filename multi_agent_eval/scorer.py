@@ -1,3 +1,4 @@
+from textwrap import dedent
 from typing import List
 
 from inspect_ai.scorer import scorer, accuracy, Score

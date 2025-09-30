@@ -2,7 +2,7 @@ import asyncio
 import ast
 from dataclasses import dataclass
 import re
-from typing import List, Dict
+from typing import List, Dict, Callable
 
 from inspect_ai.agent import AgentAttempts, Agent, react, AgentState, run, AgentPrompt
 from inspect_ai.model import ChatMessageUser
@@ -46,6 +46,7 @@ def create_agent(
     read_access: str | List[str],
     write_access: str | List[str],
     required_tests: List[str] | None = None,
+    test_tool_func: Callable | None = None,
     working_dir: str | None = None,
     attempts: int | AgentAttempts = 1,
 ) -> Agent:
@@ -88,6 +89,9 @@ If you think that your implementation depends on the changes that other agents m
  to the file that your implementation depends on.
 If you believe you have completed your part of the task, please call the `{submit}()` tool."""
 
+    if test_tool_func is None:
+        test_tool_func = create_run_tests_tool
+
     tools = [
         create_file_reader_tool(agent_id, read_access, working_dir=working_dir),
         create_file_writer_tool(
@@ -100,7 +104,7 @@ If you believe you have completed your part of the task, please call the `{submi
         ),
         create_list_files_tool(agent_id, working_dir=working_dir),
         create_wait_tool(agent_id),
-        create_run_tests_tool(agent_id, required_tests=required_tests, working_dir=working_dir),
+        test_tool_func(agent_id, required_tests=required_tests, working_dir=working_dir),
     ]
 
     return react(
@@ -117,6 +121,7 @@ If you believe you have completed your part of the task, please call the `{submi
 @solver
 def agent_collection_solver(
     agents_config: List[AgentConfig] | None = None,
+    test_tool_func: Callable | None = None,
 ) -> Solver:
     async def solve(state: TaskState, generate: Generate) -> TaskState | AgentState:
         """A multi-agent system."""
@@ -144,6 +149,7 @@ def agent_collection_solver(
                         read_access=agent_config.read_access,
                         write_access=agent_config.write_access,
                         required_tests=agent_config.required_tests,
+                        test_tool_func=test_tool_func,
                     ),
                     agent_state,
                 )

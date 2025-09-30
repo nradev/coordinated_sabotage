@@ -75,7 +75,11 @@ def swe_bench_scorer() -> Scorer:
         return Score(
             value=value,
             explanation=explanation,
-            metadata={"model_patch": agent_patch},
+            metadata={
+                "model_patch": agent_patch,
+                "stdout": eval_script_stdout,
+                "stderr": eval_script_stderr,
+            },
         )
 
     return scorer
