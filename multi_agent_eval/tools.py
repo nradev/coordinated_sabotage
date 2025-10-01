@@ -32,29 +32,27 @@ def create_file_reader_tool(
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
+                    raise ToolError(f"[{agent_id}] Sandbox environment not available")
 
                 # Check read permissions for this agent
                 if read_access is not None and file_path not in read_access:
-                    raise ToolError(
-                        f"[Agent {agent_id}] only has read access to {read_access}. Cannot read from {file_path}"
-                    )
+                    raise ToolError(f"[{agent_id}] only has read access to {read_access}. Cannot read from {file_path}")
 
                 # Ensure the file path is within the repo
                 if file_path.startswith("/") or ".." in file_path:
-                    raise ToolError(f"[Agent {agent_id}] Invalid file path. Use relative paths within the repo.")
+                    raise ToolError(f"[{agent_id}] Invalid file path. Use relative paths within the repo.")
 
                 path = file_path
                 if working_dir is not None:
                     path = f"{working_dir}/{path}"
 
                 contents = await sandbox_env.read_file(path)
-                return f"[Agent {agent_id}] Successfully read {file_path}:\n{contents}"
+                return f"[{agent_id}] Successfully read {file_path}:\n{contents}"
 
             except FileNotFoundError:
-                raise ToolError(f"[Agent {agent_id}] File {file_path} not found")
+                raise ToolError(f"[{agent_id}] File {file_path} not found")
             except Exception as e:
-                raise ToolError(f"[Agent {agent_id}] Error reading file: {str(e)}")
+                raise ToolError(f"[{agent_id}] Error reading file: {str(e)}")
 
         return execute
 
@@ -89,12 +87,12 @@ def create_file_writer_tool(
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
+                    raise ToolError(f"[{agent_id}] Sandbox environment not available")
 
                 # Check write permissions for this agent
                 if write_access is not None and file_path not in write_access:
                     raise ToolError(
-                        f"[Agent {agent_id}] only has write access to {write_access}. Cannot write to {file_path}"
+                        f"[{agent_id}] only has write access to {write_access}. Cannot write to {file_path}"
                     )
 
                 for validator in validators or []:
@@ -120,37 +118,37 @@ def create_file_writer_tool(
                 except FileNotFoundError:
                     await sandbox_env.write_file(log_path, log_entry)
 
-                return f"[Agent {agent_id}] Successfully wrote to {file_path}"
+                return f"[{agent_id}] Successfully wrote to {file_path}"
 
             except ToolError:
                 raise
             except Exception as e:
-                raise ToolError(f"[Agent {agent_id}] Error writing file: {str(e)}")
+                raise ToolError(f"[{agent_id}] Error writing file: {str(e)}")
 
         return execute
 
     return write_file()
 
 
-def create_list_files_tool(agent_id: str, working_dir: str | None = None) -> Tool:
-    """Create a tool to list all Python files in the repository."""
+def create_list_files_and_directories_tool(agent_id: str, working_dir: str | None = None) -> Tool:
+    """Create a tool to list all Python files and directories in the repository."""
 
     @tool
-    def list_files():
+    def list_files_and_directories():
         async def execute(directory: str = ".") -> str:
             """
-            List all files in the specified directory.
+            List all files and directories in the specified directory.
 
             Args:
-                directory: Directory to list files from (default: repo root)
+                directory: Directory to list files and directories from (default: repo root)
 
             Returns:
-                List of files in the directory
+                List of files and directories in the directory
             """
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
+                    raise ToolError(f"[{agent_id}] Sandbox environment not available")
 
                 # Execute ls command to list files
                 path = directory
@@ -159,19 +157,19 @@ def create_list_files_tool(agent_id: str, working_dir: str | None = None) -> Too
                 result = await sandbox_env.exec(["ls", path])
 
                 if result.returncode != 0:
-                    raise ToolError(f"[Agent {agent_id}] Error listing files: {result.stderr}")
+                    raise ToolError(f"[{agent_id}] Error listing files and directories: {result.stderr}")
 
                 files = result.stdout.strip().split("\n")
                 files = [f.replace(f"{working_dir}/", "") for f in files if f]
 
-                return f"[Agent {agent_id}] files in {directory}:\n" + "\n".join(files)
+                return f"[{agent_id}] files in and directories {directory}:\n" + "\n".join(files)
 
             except Exception as e:
-                raise ToolError(f"Error listing files: {str(e)}")
+                raise ToolError(f"Error listing files and directories: {str(e)}")
 
         return execute
 
-    return list_files()
+    return list_files_and_directories()
 
 
 def create_run_tests_tool(
@@ -196,7 +194,7 @@ def create_run_tests_tool(
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
+                    raise ToolError(f"[{agent_id}] Sandbox environment not available")
 
                 if required_tests is not None:
                     if working_dir is not None:
@@ -212,10 +210,10 @@ def create_run_tests_tool(
 
                 result = await sandbox_env.exec(cmd)
 
-                return f"[Agent {agent_id}] Test results:\n{result.stdout}\n{result.stderr}"
+                return f"[{agent_id}] Test results:\n{result.stdout}\n{result.stderr}"
 
             except Exception as e:
-                raise ToolError(f"[Agent {agent_id}] Error running tests: {str(e)}")
+                raise ToolError(f"[{agent_id}] Error running tests: {str(e)}")
 
         return execute
 
@@ -244,7 +242,7 @@ def create_run_tests_tool_SWE_bench(
             try:
                 sandbox_env = sandbox()
                 if not sandbox_env:
-                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
+                    raise ToolError(f"[{agent_id}] Sandbox environment not available")
 
                 # Environment setup with conda activation
                 repo_directory = working_dir or "/testbed"
@@ -275,10 +273,10 @@ def create_run_tests_tool_SWE_bench(
 
                 result = await sandbox_env.exec(["bash", "-c", bash_command])
 
-                return f"[Agent {agent_id}] Test results:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+                return f"[{agent_id}] Test results:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
 
             except Exception as e:
-                raise ToolError(f"[Agent {agent_id}] Error running tests: {str(e)}")
+                raise ToolError(f"[{agent_id}] Error running tests: {str(e)}")
 
         return execute
 
@@ -292,7 +290,7 @@ def create_wait_tool(agent_id: str) -> Tool:
     def wait():
         async def execute(wait_time: int = 1) -> str:
             """
-            Indicates that the agent wants to wait for actions by other agents e.g. edits to other files.
+            Indicates an intention to wait for actions by others.
 
             Args:
                 wait_time: Desired wait time (in seconds). Must be greater than 0 and less than or equal to 20.
@@ -301,11 +299,11 @@ def create_wait_tool(agent_id: str) -> Tool:
                 Message indicating the wait time has elapsed.
             """
             if wait_time > 20:
-                return f"Agent {agent_id} is not allowed to wait for longer than 10 seconds."
+                return f"[{agent_id}] is not allowed to wait for longer than 10 seconds."
 
             await asyncio.sleep(wait_time)
 
-            return f"Agent {agent_id} has waited for {wait_time} seconds."
+            return f"[{agent_id}] has waited for {wait_time} seconds."
 
         return execute
 
@@ -318,13 +316,13 @@ def create_done_tool(agent_id: str) -> AgentSubmit:
     @tool(name="done")
     def done_tool():
         async def execute() -> str:
-            """Indicate that the agent is done with all file edits."""
-            return f"Agent {agent_id} is done."
+            """Indicate that the work is complete."""
+            return f"[{agent_id}] is done."
 
         return execute
 
     return AgentSubmit(
         name="done",
-        description="Indicate that the agent is done with all file edits.",
+        description="Indicate that the work is complete.",
         tool=done_tool(),
     )

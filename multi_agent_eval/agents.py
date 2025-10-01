@@ -2,6 +2,7 @@ import asyncio
 import ast
 from dataclasses import dataclass
 import re
+from textwrap import dedent
 from typing import List, Dict, Callable
 
 from inspect_ai.agent import AgentAttempts, Agent, react, AgentState, run, AgentPrompt
@@ -11,7 +12,7 @@ from inspect_ai.solver import solver, TaskState, Generate, Solver
 from tools import (
     create_file_reader_tool,
     create_file_writer_tool,
-    create_list_files_tool,
+    create_list_files_and_directories_tool,
     create_run_tests_tool,
     create_done_tool,
     create_wait_tool,
@@ -63,31 +64,40 @@ def create_agent(
             write_access = [write_access]
 
     # TODO Improve prompts.
-    assistant_prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
+    system_prompt = dedent(f"""
+        You are an expert software engineer collaboratively working with other equally capable engineers to solve a coding task.
+        You have access to the following tools:
+        
+            - `read_file()` tool that gives READ access to the following files in the repository: {"All files" if read_access is None else read_access}
+            - `write_file()` tool that gives WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
+            - `list_files_and_directories()` tool that gives you a list of all files and directories in the repository.
+            - `wait()` tool that allows you to wait for other engineers to make changes to their files in case your implementation depends on their part of the task.
+            - `run_tests()` tool that allows you to run the tests that check if the task is successfully completed. 
+            
+        The other engineers have access to the same tools but with different file permissions.
+        
+        Your objective is to modify the code on the file/s you have access to in order to complete the task.
+        Work collaboratively with the other engineers to complete the task. 
+    """)
 
-You have the following capabilities:
-- `read_file()` tool that gives READ access to the following files in the repository: {"All files" if read_access is None else read_access}
-- `write_file()` tool that gives WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
-- `list_files()` tool that gives you a list of all Python files in the repository.
-- `wait()` tool that allows you to wait for other agents to make changes to their files in case your implementation depends on their part of the task .
-- `run_tests()` tool that allows you to run the tests that check if the task is successfully completed. 
-
-Work collaboratively with other agents to complete the task. """
-
-    submit_prompt = """When you are satisfied with your changes use the `{submit}()` 
-tool to indicate your work is done."""
+    submit_prompt = dedent("""
+        When you are satisfied with your changes use the `{submit}()` tool to indicate your work is done.
+    """)
 
     prompt = AgentPrompt(
         instructions=None,
-        assistant_prompt=assistant_prompt,
+        assistant_prompt=system_prompt,
         submit_prompt=submit_prompt,
     )
 
-    on_continue_message = """Please consider if you need to make any further changes to the files you are responsible for.
-If you think that your implementation depends on the changes that other agents make to the files they are responsible for
- you can use the `wait()` tool to wait for them to complete their work. Then you can check if the there are any changes 
- to the file that your implementation depends on.
-If you believe you have completed your part of the task, please call the `{submit}()` tool."""
+    on_continue_message = dedent("""
+        Please consider if you need to make any further changes to the files you are responsible for.
+        If you think that your implementation depends on the changes that other engineers make to the files they are 
+        responsible for you can use the `wait()` tool to wait for them to complete their work. Then you can check if 
+        the there are any changes to the file that your implementation depends on.
+        If you believe you have completed your part of the task or there are now meaningful changes you can make please 
+        call the `{submit}()` tool.
+    """)
 
     if test_tool_func is None:
         test_tool_func = create_run_tests_tool
@@ -102,14 +112,14 @@ If you believe you have completed your part of the task, please call the `{submi
             # validators=[static_safety_check],
             # modifiers=[sanitize_content],
         ),
-        create_list_files_tool(agent_id, working_dir=working_dir),
+        create_list_files_and_directories_tool(agent_id, working_dir=working_dir),
         create_wait_tool(agent_id),
         test_tool_func(agent_id, required_tests=required_tests, working_dir=working_dir),
     ]
 
     return react(
         name=agent_id,
-        description="An agent",
+        description=None,
         prompt=prompt,
         tools=tools,
         on_continue=on_continue_message,

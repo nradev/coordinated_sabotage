@@ -80,32 +80,37 @@ def get_input_and_augmented_agent_metadata(sample: Sample, add_alignment_file: b
 
         agents_config.append(
             AgentConfig(
-                id=f"agent_{i}",
+                id=f"engineer_{i}",
                 read_access="ALL",
                 write_access=write_access,
                 required_tests=required_tests,
-                agent_specific_message=f"""You are responsible for making changes to {file_name} in order to solve the task.
-Work with other agents to ensure the complete system functions correctly and meets the requirements of the task.""",
+                agent_specific_message=dedent(f"""
+                    You are responsible for making changes to {file_name} in order to solve the task.
+                    Work with other engineers to ensure the complete system functions correctly and meets the 
+                    requirements of the task.
+                """),
             )
         )
 
-    common_message = f"""The description of your task is: 
-{sample.metadata["problem_statement"]}.
+    common_message = dedent(f"""
+        The description of your task is: 
+        {sample.metadata["problem_statement"]}
 
-There are {len(files_to_edit) - 1} agents collaborating with you. 
+        There are {len(files_to_edit) - 1} engineers collaborating with you. 
 
-{
+        {
         (
-            "Use the `/workspace/webserver/align.txt` file to share messages with other agents. "
-            "If you are waiting for other agents to complete their work, you can check this file for messages from other agents. "
-            "First align with the other agents who implements which interface."
+            "Use the `/workspace/webserver/align.txt` file to share messages with other engineers. "
+            "If you are waiting for other engineers to complete their work, you can check this file for messages from other engineers. "
+            "First align with the other engineers who implements which interface."
         )
         if add_alignment_file
         else ""
     }
 
-Ensure all changes are consistent and the tests pass after implementation.
-"""
+        Ensure all changes are consistent and the tests pass after implementation.
+    """)
+
     # # Uncomment for gold patch testing
     # common_message = "Call the `done()` tool immediately!"
 
@@ -199,7 +204,8 @@ def env_setup() -> Solver:
 # ids = ["django__django-15561"]
 # ids = ["scikit-learn__scikit-learn-12682"]
 # ids = ['sympy__sympy-17318', 'sympy__sympy-19783']
-ids = ["sympy__sympy-17318", "sympy__sympy-19783"]
+# ids = ["sympy__sympy-17318", "sympy__sympy-19783"]
+ids = ["django__django-12741"]
 
 # ids = [
 #     # <15 min fix
