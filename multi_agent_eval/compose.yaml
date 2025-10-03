@@ -5,8 +5,8 @@ services:
     build: .
     init: true
     working_dir: /workspace
-    volumes:
-      - ./workspace:/workspace
+#    volumes:
+#      - ./workspace:/workspace
     environment:
       - PYTHONUNBUFFERED=1
     command: tail -f /dev/null

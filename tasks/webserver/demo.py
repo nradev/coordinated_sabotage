@@ -15,10 +15,10 @@ from webserver import WebServer, Response, LoggingMiddleware, CORSMiddleware
 def create_demo_server():
     """Create a simple demo server."""
     app = WebServer(host="localhost", port=8080)
-    
+
     # Add CORS middleware
     app.add_middleware(CORSMiddleware())
-    
+
     @app.get("/")
     def home(request):
         """Home page."""
@@ -70,48 +70,48 @@ curl -X POST http://localhost:8080/api/echo \\
         </body>
         </html>
         """)
-    
+
     @app.get("/api/hello")
     def hello(request):
         """Simple JSON response."""
-        return Response.json({
-            "message": "Hello from the demo server!",
-            "server": "simple-webserver",
-            "version": "0.1.0"
-        })
-    
+        return Response.json(
+            {
+                "message": "Hello from the demo server!",
+                "server": "simple-webserver",
+                "version": "0.1.0",
+            }
+        )
+
     @app.get("/api/users/{user_id}")
     def get_user(request, user_id):
         """Get user by ID."""
         try:
             user_id = int(user_id)
-            return Response.json({
-                "user_id": user_id,
-                "name": f"User {user_id}",
-                "email": f"user{user_id}@example.com"
-            })
-        except ValueError:
             return Response.json(
-                {"error": "Invalid user ID"}, 
-                status_code=400
+                {
+                    "user_id": user_id,
+                    "name": f"User {user_id}",
+                    "email": f"user{user_id}@example.com",
+                }
             )
-    
+        except ValueError:
+            return Response.json({"error": "Invalid user ID"}, status_code=400)
+
     @app.post("/api/echo")
     def echo(request):
         """Echo back the JSON data."""
         data = request.json
         if not data:
-            return Response.json(
-                {"error": "JSON body required"}, 
-                status_code=400
-            )
-        
-        return Response.json({
-            "echo": data,
-            "received_at": "2024-01-01T00:00:00Z",
-            "content_length": request.content_length
-        })
-    
+            return Response.json({"error": "JSON body required"}, status_code=400)
+
+        return Response.json(
+            {
+                "echo": data,
+                "received_at": "2024-01-01T00:00:00Z",
+                "content_length": request.content_length,
+            }
+        )
+
     return app
 
 
@@ -119,15 +119,17 @@ def main():
     """Run the demo server."""
     print("🚀 Starting Demo Web Server...")
     print("=" * 40)
-    
+
     app = create_demo_server()
-    
-    print(f"✅ Server configured with {len(app.router.middleware)} middleware components")
+
+    print(
+        f"✅ Server configured with {len(app.router.middleware)} middleware components"
+    )
     print("🌐 Server starting on http://localhost:8080")
     print("📝 Visit http://localhost:8080 to see the demo page")
     print("🛑 Press Ctrl+C to stop the server")
     print("=" * 40)
-    
+
     try:
         app.start()
     except KeyboardInterrupt:

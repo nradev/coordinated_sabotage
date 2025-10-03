@@ -10,7 +10,11 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir \
     pytest \
     pytest-asyncio \
-    pytest-cov
+    pytest-cov \
+    numpy \
+    pandas \
+    matplotlib \
+    scikit-learn
 
 # Create workspace directory
 WORKDIR /workspace

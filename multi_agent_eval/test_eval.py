@@ -15,6 +15,7 @@ from agents import agent_collection_solver
 # TODO: setup a real python project with deep imports
 import unique_digits
 import webserver
+import bcb_sample_42
 from scorer import multi_agent_scorer
 
 
@@ -29,7 +30,8 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
     """
 
     # dataset = MemoryDataset([unique_digits.create_sample()])
-    dataset = MemoryDataset([webserver.create_sample(n_agents=3, add_alignment_file=False)])
+    # dataset = MemoryDataset([webserver.create_sample(n_agents=3, add_alignment_file=False)])
+    dataset = MemoryDataset([bcb_sample_42.create_sample()])
 
     return Task(
         dataset=dataset,
