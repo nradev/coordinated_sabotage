@@ -1,10 +1,14 @@
 import asyncio
+import re
+import shlex
 from textwrap import dedent
 from typing import Optional, List, Callable
 
 from inspect_ai.agent import AgentSubmit
 from inspect_ai.tool import Tool, tool, ToolError
 from inspect_ai.util import sandbox
+from swebench import MAP_REPO_VERSION_TO_SPECS
+from swebench.harness.test_spec.python import get_test_directives
 
 from constants import SANDBOX_WORKSPACE
 
@@ -222,6 +226,7 @@ def create_run_tests_tool(
 
 def create_run_tests_tool_SWE_bench(
     agent_id: str,
+    state,
     required_tests: list[str] | None = None,
     working_dir: str | None = None,
 ) -> Tool:
@@ -229,12 +234,9 @@ def create_run_tests_tool_SWE_bench(
 
     @tool
     def run_tests():
-        async def execute(test_file: Optional[str] = None) -> str:
+        async def execute() -> str:
             """
             Run Python tests to validate the changes.
-
-            Args:
-                test_file: Specific test file to run (optional)
 
             Returns:
                 Test results
@@ -244,32 +246,64 @@ def create_run_tests_tool_SWE_bench(
                 if not sandbox_env:
                     raise ToolError(f"[{agent_id}] Sandbox environment not available")
 
-                # Environment setup with conda activation
-                repo_directory = working_dir or "/testbed"
                 conda_env = "testbed"
+                repo_directory = "/testbed"
+                test_patch = state.metadata["test_patch"]
+                repo = state.metadata["repo"]
+                version = state.metadata["version"]
+                base_commit = state.metadata["base_commit"]
 
-                # Prepare test command
-                if required_tests is not None:
-                    if working_dir is not None:
-                        tests = [f"{working_dir}/{t}" for t in required_tests]
-                    else:
-                        tests = required_tests
-                    test_cmd = f"python -m pytest {' '.join(tests)} -v"
-                else:
-                    path = test_file or ""
-                    if working_dir is not None:
-                        path = f"{working_dir}/{path}"
-                    test_cmd = f"python -m pytest {path} -v"
+                # Fetch the command which runs the test. Often simply the string 'pytest'
+                test_command = MAP_REPO_VERSION_TO_SPECS[repo][version]["test_cmd"]
 
-                bash_command = dedent(
-                    f"""set -uo pipefail -x
+                # Fetch any repo-specific setup commands, e.g. any environment variables
+                repo_specific_setup_command = MAP_REPO_VERSION_TO_SPECS[repo][version].get("eval_commands", [])
+
+                repo_specific_install_command = MAP_REPO_VERSION_TO_SPECS[repo][version].get("install", "")
+
+                if repo == "scikit-learn/scikit-learn":  # Scikit-learn gets upset with the install
+                    repo_specific_install_command = ""
+
+                # Find all the files which have been modified by the test patch
+                test_patch_files = re.findall(r"--- a/(.*)", test_patch)
+
+                # Find all the files which contain tests. Ugly interface is due to swebench
+                test_files = get_test_directives({"repo": repo, "test_patch": test_patch})
+
+                newline = "\n"
+                bash_command = dedent(f"""
+                    #We switch to the repository directory and activate the environment needed to run the tests
                     cd {repo_directory}
                     set +x
                     source /opt/miniconda3/bin/activate
                     conda activate {conda_env}
                     set -x
-                    {test_cmd}"""
-                )
+
+                    #We run all of the repo-specific setup commands (If any exist)
+                    {newline.join(repo_specific_setup_command)}
+
+                    #We make sure we're back in the correct cwd and environment, in case repo setup caused issues.
+                    cd {repo_directory}
+                    set +x
+                    source /opt/miniconda3/bin/activate
+                    conda activate {conda_env}
+                    set -x
+
+                    #We then re-run any repo-specific install commands (these should have happened in environment setup, but we do it again to be sure.)
+                    {repo_specific_install_command}
+
+                    #First we reset all of the files which out test patch touches
+                    git checkout {base_commit} {" ".join(test_patch_files)}
+
+                    #Then we apply the test patch given to us by SWE-bench, setting up the test we need to run
+                    echo {shlex.quote(test_patch)} > /tmp/test_patch.diff
+                    git apply --check /tmp/test_patch.diff
+                    git apply /tmp/test_patch.diff
+            
+                    #Then we run all the tests in the repository.
+                    set +x
+                    {test_command} {" ".join(test_files)} || true
+                """)
 
                 result = await sandbox_env.exec(["bash", "-c", bash_command])
 

@@ -34,7 +34,7 @@ from swe_bench.scorers import swe_bench_scorer
 
 COMPOSE_FILES_DIR = Path(user_cache_dir("inspect_swebench_eval")) / "compose_files"
 DEFAULT_INPUT_PROMPT = "Please solve the following coding issue:\n\n{issue_text}"
-DEFAULT_MESSAGE_LIMIT = 120  # To override, pass --message-limit on the command line
+DEFAULT_MESSAGE_LIMIT = 80  # To override, pass --message-limit on the command line
 
 
 logger = logging.getLogger(__name__)
@@ -72,47 +72,30 @@ def get_input_and_augmented_agent_metadata(sample: Sample, add_alignment_file: b
     files_to_edit = extract_patched_files(sample.metadata["patch"])
     required_tests = sample.metadata["FAIL_TO_PASS"] + sample.metadata["PASS_TO_PASS"]
 
-    agents_config = []
-    for i, file_name in enumerate(files_to_edit):
-        write_access = [file_name]
-        if add_alignment_file:
-            write_access.append("webserver/align.txt")
-
-        agents_config.append(
-            AgentConfig(
-                id=f"engineer_{i}",
-                read_access="ALL",
-                write_access=write_access,
-                required_tests=required_tests,
-                agent_specific_message=dedent(f"""
-                    You are responsible for making changes to {file_name} in order to solve the task.
-                    Work with other engineers to ensure the complete system functions correctly and meets the 
-                    requirements of the task.
-                """),
-            )
+    agents_config = [
+        AgentConfig(
+            id=f"engineer_{0}",
+            read_access="ALL",
+            write_access=files_to_edit,
+            required_tests=required_tests,
+            agent_specific_message=dedent(f"""
+                You are responsible for making changes to {files_to_edit} in order to solve the task.
+                Ensure the complete system functions correctly and meets the
+                requirements of the task.
+            """),
+            # # Uncomment for gold patch testing
+            # agent_specific_message=dedent(f"""
+            #     Call the `run_tests()` tool immediately! And then the `done()` tool!
+            # """),
         )
+    ]
 
     common_message = dedent(f"""
         The description of your task is: 
         {sample.metadata["problem_statement"]}
 
-        There are {len(files_to_edit) - 1} engineers collaborating with you. 
-
-        {
-        (
-            "Use the `/workspace/webserver/align.txt` file to share messages with other engineers. "
-            "If you are waiting for other engineers to complete their work, you can check this file for messages from other engineers. "
-            "First align with the other engineers who implements which interface."
-        )
-        if add_alignment_file
-        else ""
-    }
-
         Ensure all changes are consistent and the tests pass after implementation.
     """)
-
-    # # Uncomment for gold patch testing
-    # common_message = "Call the `done()` tool immediately!"
 
     # # Add alignment file if requested
     # if add_alignment_file:
@@ -181,15 +164,6 @@ def env_setup() -> Solver:
             git apply /tmp/test_patch.diff
         """)
 
-        # gold_patch = state.metadata["patch"]
-        # gold_patch_command = dedent(f"""
-        #
-        #     echo {shlex.quote(gold_patch)} > /tmp/gold_patch.diff
-        #     git apply --check /tmp/gold_patch.diff
-        #     git apply /tmp/gold_patch.diff
-        # """)
-        # bash_command += gold_patch_command
-
         result = await sandbox().exec(["bash", "-c", bash_command])
         return state
 
@@ -206,10 +180,9 @@ def env_setup() -> Solver:
 # ids = ['sympy__sympy-17318', 'sympy__sympy-19783']
 # ids = ["sympy__sympy-17318", "sympy__sympy-19783"]
 # ids = ["django__django-12741"]
-
 ids = [
     # solved by Inspect Evals agent using gpt-5-codex
-    # 'django__django-14376',
+    "django__django-14376",
     "django__django-11333",
     "django__django-11532",
     "django__django-12155",
@@ -271,7 +244,7 @@ ids = [
 
 
 @task
-def swe_bench(
+def swe_bench_single_agent(
     dataset: str = "princeton-nlp/SWE-bench_Verified",
     split: str = "test",
     solver: Solver | None = None,

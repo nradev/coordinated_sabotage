@@ -15,4 +15,3 @@ class Middleware:
     def __call__(self, request: Request) -> Optional[Response]:
         """Process the request. Return None to continue, or Response to short-circuit."""
         return None
-
