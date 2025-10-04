@@ -54,8 +54,9 @@ def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None)
             except FileNotFoundError:
                 raise ToolError(f"[Agent {agent_id}] File {file_path} not found")
             except Exception as e:
-                logger.exception()
-                raise ToolError(f"[Agent {agent_id}] Error reading file: {str(e)}")
+                msg = f"[Agent {agent_id}] Error reading file: {str(e)}"
+                logger.exception(msg)
+                raise ToolError(msg)
 
         return execute
 
@@ -122,8 +123,9 @@ def create_file_writer_tool(
             except ToolError:
                 raise
             except Exception as e:
-                logger.exception()
-                raise ToolError(f"[Agent {agent_id}] Error writing file: {str(e)}")
+                msg = f"[Agent {agent_id}] Error writing file: {str(e)}"
+                logger.exception(msg)
+                raise ToolError(msg)
 
         return execute
 
@@ -164,8 +166,9 @@ def create_list_files_tool(agent_id: str) -> Tool:
                 return f"[Agent {agent_id}] Python files in {directory}:\n" + "\n".join(files)
 
             except Exception as e:
-                logger.exception()
-                raise ToolError(f"Error listing files: {str(e)}")
+                msg = f"[Agent {agent_id}] Error listing files: {str(e)}"
+                logger.exception(msg)
+                raise ToolError(msg)
 
         return execute
 
