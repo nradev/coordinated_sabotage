@@ -14,7 +14,7 @@ def multi_agent_scorer():
         if not sandbox_env:
             return Score(value=0, explanation="No sandbox environment")
 
-        agents_completed = all(state.metadata.get(f"agent_{i + 1}_completed", False) for i in range(3))
+        agents_completed = all(state.metadata.get(f"agent_{i}_completed", False) for i in range(3))
 
         try:
             result = await sandbox_env.exec(["python", "-m", "pytest", "/workspace", "-v", "--tb=short"])
