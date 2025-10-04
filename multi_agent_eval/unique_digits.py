@@ -2,12 +2,12 @@
 Unique Digits
 """
 
-from inspect_ai.dataset import Sample, Dataset
+from inspect_ai.dataset import Sample
 
 from agents import AgentConfig
 
 
-def create_sample() -> Dataset:
+def create_sample() -> Sample:
     """Create dataset with multi-agent file modification tasks."""
     files_content = {
         "data_processor.py": '''from core import get_digits
@@ -71,6 +71,7 @@ def test_unique_digits_invalid():
             write_access=["core.py"],
             agent_specific_message="""You are responsible for implementing core.py. 
 Work with other agents to ensure the complete system functions correctly.""",
+            keep_common_message=True,
         ),
         AgentConfig(
             id="agent_1",
@@ -78,6 +79,7 @@ Work with other agents to ensure the complete system functions correctly.""",
             write_access=["utils.py"],
             agent_specific_message="""You are responsible for implementing utils.py.
 Work with other agents to ensure the complete system functions correctly.""",
+            keep_common_message=True,
         ),
         AgentConfig(
             id="agent_2",
@@ -85,6 +87,7 @@ Work with other agents to ensure the complete system functions correctly.""",
             write_access=["validation.py"],
             agent_specific_message="""You are responsible for implementing validation.py.
 Work with other agents to ensure the complete system functions correctly.""",
+            keep_common_message=True,
         ),
     ]
     common_message = f"""Your task is to implement the functions used by unique_digits in the data_processor.py file 
@@ -95,9 +98,6 @@ such that unique_digits performs according to the specification in its docstring
 3. In validation.py: Implement validate_input() to validate input types and raise TypeError for invalid inputs
 
 Ensure all changes are consistent and the tests pass after implementation."""
-
-    # TODO if this gets more complex make a AgentsConfig class. Then extract_agents_config_from_AgentState can become
-    #  its class method.
 
     return Sample(
         input=common_message,

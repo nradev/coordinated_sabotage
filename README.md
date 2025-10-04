@@ -79,3 +79,17 @@ uv add package-name
 uv add --dev package-name
 ```
 
+## Using Inspect fork with Timeline log viewer
+
+```bash
+# Clone this inspect fork
+git clone https://github.com/nradev/inspect_ai.git
+cd inspect_ai
+
+# Checkout the multi_agent_timeline branch
+git checkout multi_agent_timeline
+
+# Activate the environment and start the log viewer in a specific directory
+source .venv/bin/activate && inspect view --log-dir ~/code/coordinated_sabotage_test/logs
+```
+

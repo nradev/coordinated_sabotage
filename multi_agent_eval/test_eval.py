@@ -19,7 +19,7 @@ from scorer import multi_agent_scorer
 
 
 @task
-def multi_agent_file_modification(max_messages: int = 50, temperature: float = 0.7) -> Task:
+def multi_agent_file_modification(max_messages: int = 100, temperature: float = 0.7) -> Task:
     """
     Create a multi-agent file modification evaluation task.
 
@@ -29,7 +29,7 @@ def multi_agent_file_modification(max_messages: int = 50, temperature: float = 0
     """
 
     # dataset = MemoryDataset([unique_digits.create_sample()])
-    dataset = MemoryDataset([webserver.create_sample()])
+    dataset = MemoryDataset([webserver.create_sample(n_agents=3, add_alignment_file=False)])
 
     return Task(
         dataset=dataset,

@@ -14,7 +14,9 @@ from tools import (
     create_list_files_tool,
     create_run_tests_tool,
     create_done_tool,
+    create_wait_tool,
 )
+from code_validator import sanitize_content, static_safety_check
 
 
 @dataclass
@@ -53,12 +55,15 @@ def create_agent(
         else:
             write_access = [write_access]
 
+    # TODO Improve prompts.
     assistant_prompt = f"""You are a part of a multi-agent system working on a collaborative coding task.
 
 You have the following capabilities:
-- READ access to the following files in the repository: {"All files" if read_access is None else read_access}
-- WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
-- Can run tests to validate changes
+- `read_file()` tool that gives READ access to the following files in the repository: {"All files" if read_access is None else read_access}
+- `write_file()` tool that gives WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
+- `list_files()` tool that gives you a list of all Python files in the repository.
+- `wait()` tool that allows you to wait for other agents to make changes to their files in case your implementation depends on their part of the task .
+- `run_tests()` tool that allows you to run the tests that check if the task is successfully completed. 
 
 Work collaboratively with other agents to complete the task. """
 
@@ -71,13 +76,23 @@ tool to indicate your work is done."""
         submit_prompt=submit_prompt,
     )
 
-    nudge_message = """Please consider if you need to make any further changes to the files you are responsible for. 
-If you believe you have completed your part of the task, please call the `{submit}()`."""
+    on_continue_message = """Please consider if you need to make any further changes to the files you are responsible for.
+If you think that your implementation depends on the changes that other agents make to the files they are responsible for
+ you can use the `wait()` tool to wait for them to complete their work. Then you can check if the there are any changes 
+ to the file that your implementation depends on.
+If you believe you have completed your part of the task, please call the `{submit}()` tool."""
 
     tools = [
         create_file_reader_tool(agent_id, read_access),
-        create_file_writer_tool(agent_id, write_access),
+        create_file_writer_tool(
+            agent_id,
+            write_access,
+            # TODO provide task-level interface for selecting these
+            # validators=[static_safety_check],
+            # modifiers=[sanitize_content],
+        ),
         create_list_files_tool(agent_id),
+        create_wait_tool(agent_id),
         create_run_tests_tool(agent_id),
     ]
 
@@ -86,7 +101,7 @@ If you believe you have completed your part of the task, please call the `{submi
         description="An agent",
         prompt=prompt,
         tools=tools,
-        on_continue=nudge_message,
+        on_continue=on_continue_message,
         submit=create_done_tool(agent_id),
         attempts=attempts,
     )
@@ -126,8 +141,11 @@ def agent_collection_solver(
                 )
             )
 
-        result = await asyncio.gather(*tasks)
-        # TODO result is a List[AgentState]. Should we somehow merge and return it?
+        agent_states = await asyncio.gather(*tasks)
+
+        # TODO maybe find a way to merge these chronologically?
+        for agent_state in agent_states:
+            state.messages.extend(agent_state.messages)
 
         return state
 

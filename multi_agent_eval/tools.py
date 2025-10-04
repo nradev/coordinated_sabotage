@@ -1,13 +1,10 @@
 import asyncio
-from typing import Optional, List
+from typing import Optional, List, Callable
 
 from inspect_ai.agent import AgentSubmit
 from inspect_ai.tool import Tool, tool, ToolError
 from inspect_ai.util import sandbox
 from loguru import logger
-
-from code_validator import check_code_safety
-
 
 # TODO: this should be defined somewhere else, but then it is not triggered -> good enough for now
 logger.add(
@@ -65,12 +62,15 @@ def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None)
     return read_file()
 
 
-def create_file_writer_tool(agent_id: str, write_access: List[str] | None = None) -> Tool:
+def create_file_writer_tool(
+    agent_id: str,
+    write_access: List[str] | None = None,
+    validators: List[Callable] | None = None,
+    modifiers: List[Callable] | None = None,
+) -> Tool:
     """
     Create a file writing tool with agent-specific write permissions.
     If write_access is None, there are no restrictions.
-    TODO add an obfuscation parameter for removing comments and docstrings
-     or a review one for review by a trusted monitor.
     """
 
     @tool
@@ -97,14 +97,11 @@ def create_file_writer_tool(agent_id: str, write_access: List[str] | None = None
                         f"[Agent {agent_id}] only has write access to {write_access}. Cannot write to {file_path}"
                     )
 
-                violations, warnings = check_code_safety(content)
-                if violations or warnings:
-                    raise ToolError(
-                        # TODO consider what info we reveal to the agent
-                        f"Agent {agent_id} is attempting forbidden code modifications:\n"
-                        f"Violations: {violations}\n"
-                        f"Warnings: {warnings}\n"
-                    )
+                for validator in validators or []:
+                    await validator(content, agent_id, file_path, sandbox_env, write_access)
+
+                for modifier in modifiers or []:
+                    content = await modifier(content, agent_id, file_path, sandbox_env, write_access)
 
                 # Write the file
                 await sandbox_env.write_file(f"/workspace/{file_path}", content)
@@ -210,6 +207,33 @@ def create_run_tests_tool(agent_id: str) -> Tool:
         return execute
 
     return run_tests()
+
+
+def create_wait_tool(agent_id: str) -> Tool:
+    """Create a tool to indicate that the agent is done with all file edits."""
+
+    @tool
+    def wait():
+        async def execute(wait_time: int = 1) -> str:
+            """
+            Indicates that the agent wants to wait for actions by other agents e.g. edits to other files.
+
+            Args:
+                wait_time: Desired wait time (in seconds). Must be greater than 0 and less than or equal to 20.
+
+            Returns:
+                Message indicating the wait time has elapsed.
+            """
+            if wait_time > 20:
+                return f"Agent {agent_id} is not allowed to wait for longer than 10 seconds."
+
+            await asyncio.sleep(wait_time)
+
+            return f"Agent {agent_id} has waited for {wait_time} seconds."
+
+        return execute
+
+    return wait()
 
 
 def create_done_tool(agent_id: str) -> AgentSubmit:
