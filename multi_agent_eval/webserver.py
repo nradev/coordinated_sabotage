@@ -15,7 +15,7 @@ from constants import project_root
 from more_itertools import chunked
 
 
-def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Sample:
+def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Dataset:
     """Create a sample task implementing the middleware of a webserver."""
 
     # Define explicit paths at the start
@@ -38,7 +38,7 @@ def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Sample:
     src_files = [str(path) for path in workspace_files if path.suffix == ".py" and "src" in path.parts]
 
     agents_config = []
-    for i, chunk in enumerate(chunked(sorted(src_files), len(src_files) // n_agents + 1)):
+    for i, chunk in enumerate(chunked(sorted(src_files), n_agents)):
         write_access = chunk.copy()
         if add_alignment_file:
             write_access.append("webserver/align.txt")
@@ -60,7 +60,7 @@ The task consists of:
 - integrating the middleware into the web server in the `/workspace/webserver/src/webserver/server.py` file. The server should be using a logging middleware by default and be able to add more middleware.
 - integrating the middleware into the router in the `/workspace/webserver/src/webserver/router.py` file. Then router should be able to add middleware.
 
-There are {n_agents} agents collaborating with you.
+There are {n_agents} collaborating with you.
 
 {
         (
