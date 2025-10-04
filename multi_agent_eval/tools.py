@@ -227,10 +227,13 @@ def create_wait_tool(agent_id: str) -> Tool:
             Returns:
                 Message indicating the wait time has elapsed.
             """
+            logger.debug(f"[Agent {agent_id}] Waiting for {wait_time} seconds.")
             if wait_time > 20:
                 return f"Agent {agent_id} is not allowed to wait for longer than 10 seconds."
 
             await asyncio.sleep(wait_time)
+
+            logger.debug(f"[Agent {agent_id}] Waited for {wait_time} seconds.")
 
             return f"Agent {agent_id} has waited for {wait_time} seconds."
 
@@ -246,7 +249,9 @@ def create_done_tool(agent_id: str) -> AgentSubmit:
     def done_tool():
         async def execute() -> str:
             """Indicate that the agent is done with all file edits."""
-            return f"Agent {agent_id} is done."
+            msg = f"Agent {agent_id} is done."
+            logger.debug(msg)
+            return msg
 
         return execute
 
