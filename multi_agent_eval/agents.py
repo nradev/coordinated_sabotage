@@ -5,10 +5,11 @@ import pprint
 import re
 from typing import List, Dict
 
-from inspect_ai.agent import AgentAttempts, Agent, react, AgentState, run, AgentPrompt
-from inspect_ai.model import ChatMessageUser
+from inspect_ai.agent import AgentAttempts, Agent, agent, react, AgentState, run, AgentPrompt
+from inspect_ai.model import ChatMessageSystem, ChatMessageUser, execute_tools, get_model
 from inspect_ai.solver import solver, TaskState, Generate, Solver
 from inspect_ai.util import sandbox
+from loguru import logger
 
 from tools import (
     create_file_reader_tool,
@@ -109,68 +110,71 @@ If you believe you have completed your part of the task, please call the `{submi
     )
 
 
-def single_step_agent(
-    agent_id: str,
-    write_access: str | List[str],
-    attempts: int | AgentAttempts = 1,
-) -> Agent:
-    if isinstance(write_access, str):
-        if write_access.upper() in ["ALL"]:
-            write_access = None
-        else:
-            write_access = [write_access]
+@agent
+def forgetful_agent() -> Agent:
+    """A forgetful agent that does not remember its conversation history.
 
-    # TODO Improve prompts.
-    assistant_prompt = f"""You are a Senior Software Engineer working on a Python codebase.
+    This agent is a baseline for the multi-agent evaluation. It always receives the full project state and is given one
+    write action.
+    """
+
+    async def execute(state: AgentState) -> AgentState:
+        # clear the conversation history
+        while True:
+            state.messages = []
+            state.messages.append(
+                ChatMessageSystem(
+                    content=f"""
+You are a Senior Software Engineer working on a Python codebase.
 
 You have the following capabilities:
-- `write_file()` tool that gives WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
+- `write_file()` tool that gives WRITE access to every file in the project.
 
-Do some reasoning before your actions, describing what tool calls
-you are going to use and how they fit into your plan
-"""
+Do some reasoning before your actions, describing what tool calls you are going to use and how they fit into your plan
 
-    submit_prompt = """When you are satisfied with your changes use the `{submit}()` 
-tool to indicate your work is done."""
+When you are satisfied with your changes use the `submit()` tool to indicate your work is done."""
+                )
+            )
 
-    prompt = AgentPrompt(
-        instructions=None,
-        assistant_prompt=assistant_prompt,
-        submit_prompt=submit_prompt,
-    )
+            state.messages.append(ChatMessageUser(content=await get_project_state(state)))
 
-    tools = [
-        create_file_writer_tool(
-            agent_id,
-            write_access,
-        ),
-        # create_run_tests_tool(agent_id),
-    ]
+            tools = [
+                create_file_writer_tool(
+                    "agent_0",
+                    None,
+                )
+            ]
 
-    return react(
-        name=agent_id,
-        description="An agent",
-        prompt=prompt,
-        tools=tools,
-        on_continue=continue_with_project_state,
-        submit=create_done_tool(agent_id),
-        attempts=attempts,
-    )
+            output = await get_model().generate(state.messages, tools)
+            state.messages.append(output.message)
+
+            logger.debug(f"Agent messages: {state.messages}")
+            logger.debug(f"Agent output: {output}")
+
+            if output.message.tool_calls:
+                messages, output = await execute_tools(state.messages, tools)
+                state.messages.extend(messages)
+                state.output = output
+            else:
+                break
+        return state
+
+    return execute
 
 
-async def continue_with_project_state(agent_state: AgentState) -> bool | str:
+async def get_project_state(agent_state: AgentState) -> bool | str:
     env = sandbox()
 
-    breakpoint()
-    files = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f"])
+    result = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f"])
 
     contents = {}
-    for file in files:
-        contents[file] = await env.read_file(f"/workspace/{file}")
+    for file in result.stdout.strip().split("\n"):
+        contents[file.replace("/workspace/", "")] = await env.read_file(file)
 
-    test_results = await env.exec(["pytest", "-q", "--tb=line", "|", "tail", "-n", "1"])
+    test_results = await env.exec(["python", "-m", "pytest", f"/workspace/", "-q", "--tb=line"])
+    test_results = test_results.stdout.strip().split("\n")[-1]
 
-    return f"""Remember, you are given one write action, then your state will be reset.
+    project_state = f"""Remember, you are given one write action, then your state will be reset.
 
 The current project state is 
 {pprint.pformat(contents)}
@@ -180,6 +184,8 @@ The current test results are:
 
 If you are satisfied with the current state, you can call the `submit()` tool.
 """
+    logger.debug(project_state)
+    return project_state
 
 
 @solver
