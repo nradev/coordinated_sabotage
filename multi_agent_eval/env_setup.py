@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 from typing import Dict
 
-from test_eval import create_multi_agent_dataset
+from test_eval import create_sample
 
 
 def create_dockerfile_content() -> str:
@@ -87,4 +87,4 @@ def setup_evaluation_environment(files_content: Dict[str, str], output_dir: Path
 
 
 if __name__ == "__main__":
-    setup_evaluation_environment(create_multi_agent_dataset()[0].files)
+    setup_evaluation_environment(create_sample()[0].files)

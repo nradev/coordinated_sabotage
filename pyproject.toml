@@ -11,6 +11,10 @@ dependencies = [
     "pytest>=8.4.2",
 ]
 
+[tool.uv]
+package = true
+
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.3.0",
