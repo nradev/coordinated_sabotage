@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 from typing import Dict
 
-from test_eval import create_sample
+from multi_agent_eval.tasks import create_sample
 
 
 def create_dockerfile_content() -> str:

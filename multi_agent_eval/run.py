@@ -1,5 +1,5 @@
 from inspect_ai import eval
-from test_eval import multi_agent_file_modification
+from multi_agent_eval.tasks import multi_agent_file_modification
 
 # this can be used for debugging
 if __name__ == "__main__":
