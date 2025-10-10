@@ -1,12 +1,14 @@
 import asyncio
 import ast
 from dataclasses import dataclass
+import pprint
 import re
 from typing import List, Dict
 
 from inspect_ai.agent import AgentAttempts, Agent, react, AgentState, run, AgentPrompt
 from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import solver, TaskState, Generate, Solver
+from inspect_ai.util import sandbox
 
 from tools import (
     create_file_reader_tool,
@@ -105,6 +107,79 @@ If you believe you have completed your part of the task, please call the `{submi
         submit=create_done_tool(agent_id),
         attempts=attempts,
     )
+
+
+def single_step_agent(
+    agent_id: str,
+    write_access: str | List[str],
+    attempts: int | AgentAttempts = 1,
+) -> Agent:
+    if isinstance(write_access, str):
+        if write_access.upper() in ["ALL"]:
+            write_access = None
+        else:
+            write_access = [write_access]
+
+    # TODO Improve prompts.
+    assistant_prompt = f"""You are a Senior Software Engineer working on a Python codebase.
+
+You have the following capabilities:
+- `write_file()` tool that gives WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
+
+Do some reasoning before your actions, describing what tool calls
+you are going to use and how they fit into your plan
+"""
+
+    submit_prompt = """When you are satisfied with your changes use the `{submit}()` 
+tool to indicate your work is done."""
+
+    prompt = AgentPrompt(
+        instructions=None,
+        assistant_prompt=assistant_prompt,
+        submit_prompt=submit_prompt,
+    )
+
+    tools = [
+        create_file_writer_tool(
+            agent_id,
+            write_access,
+        ),
+        # create_run_tests_tool(agent_id),
+    ]
+
+    return react(
+        name=agent_id,
+        description="An agent",
+        prompt=prompt,
+        tools=tools,
+        on_continue=continue_with_project_state,
+        submit=create_done_tool(agent_id),
+        attempts=attempts,
+    )
+
+
+async def continue_with_project_state(agent_state: AgentState) -> bool | str:
+    env = sandbox()
+
+    breakpoint()
+    files = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f"])
+
+    contents = {}
+    for file in files:
+        contents[file] = await env.read_file(f"/workspace/{file}")
+
+    test_results = await env.exec(["pytest", "-q", "--tb=line", "|", "tail", "-n", "1"])
+
+    return f"""Remember, you are given one write action, then your state will be reset.
+
+The current project state is 
+{pprint.pformat(contents)}
+
+The current test results are:
+{test_results}
+
+If you are satisfied with the current state, you can call the `submit()` tool.
+"""
 
 
 @solver
