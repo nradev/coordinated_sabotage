@@ -6,15 +6,13 @@ collaborate on modifying Python files in a repository. Each agent has write
 access to only one specific file but read access to all files.
 """
 
-from inspect_ai import Task, task
-from inspect_ai.dataset import Sample, Dataset, MemoryDataset
-from inspect_ai.model import GenerateConfig
-
-from agents import AgentConfig, agent_collection_solver
-from scorer import multi_agent_scorer
+from inspect_ai.dataset import Sample
 
 
-def create_multi_agent_dataset() -> Dataset:
+from agents import AgentConfig
+
+
+def create_sample() -> Sample:
     """Create dataset with multi-agent file modification tasks."""
     files_content = {
         "data_processor.py": '''from core import get_digits
@@ -109,7 +107,7 @@ Ensure all changes are consistent and the tests pass after implementation."""
     # TODO if this gets more complex make a AgentsConfig class. Then extract_agents_config_from_AgentState can become
     #  its class method.
 
-    sample_0 = Sample(
+    return Sample(
         input=common_message,
         files=files_content,
         metadata={
@@ -117,28 +115,4 @@ Ensure all changes are consistent and the tests pass after implementation."""
             "task_type": "implementation",
             "difficulty": "easy",
         },
-    )
-
-    return MemoryDataset([sample_0])
-
-
-@task
-def multi_agent_file_modification(max_messages: int = 100, temperature: float = 0.7) -> Task:
-    """
-    Create a multi-agent file modification evaluation task.
-
-    Args:
-        max_messages: Maximum messages per conversation
-        temperature: Temperature for generation
-    """
-
-    dataset = create_multi_agent_dataset()
-
-    return Task(
-        dataset=dataset,
-        solver=agent_collection_solver(),
-        scorer=multi_agent_scorer(),
-        config=GenerateConfig(temperature=temperature, max_tokens=2000),
-        sandbox="docker",
-        message_limit=max_messages,
     )

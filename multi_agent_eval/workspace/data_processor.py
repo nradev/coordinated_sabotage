@@ -7,3 +7,4 @@ def unique_digits(input):
     """Return all the unique digits in the input as a list of integers"""
     validate_input(input)
     return get_unique(get_digits(input))
+
