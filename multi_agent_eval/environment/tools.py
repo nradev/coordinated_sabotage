@@ -11,7 +11,7 @@ from inspect_ai.util import sandbox
 from swebench import MAP_REPO_VERSION_TO_SPECS
 from swebench.harness.test_spec.python import get_test_directives
 
-from constants import SANDBOX_WORKSPACE
+from .constants import SANDBOX_WORKSPACE
 
 
 def create_file_reader_tool(

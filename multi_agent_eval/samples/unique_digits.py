@@ -9,7 +9,7 @@ access to only one specific file but read access to all files.
 from inspect_ai.dataset import Sample
 
 
-from agents import AgentConfig
+from ..environment.agents import AgentConfig
 
 
 def create_sample() -> Sample:

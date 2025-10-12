@@ -7,11 +7,11 @@ access to only one specific file but read access to all files.
 """
 
 from pathlib import Path
-from inspect_ai.dataset import Sample, Dataset
+from inspect_ai.dataset import Sample
 
-from agents import AgentConfig
+from multi_agent_eval.environment.agents import AgentConfig
 
-from constants import project_root, SANDBOX_WORKSPACE
+from multi_agent_eval.environment.constants import project_root, SANDBOX_WORKSPACE
 from more_itertools import chunked
 
 

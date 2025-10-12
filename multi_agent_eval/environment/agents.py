@@ -9,7 +9,7 @@ from inspect_ai.agent._filter import MessageFilter
 from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import solver, TaskState, Generate, Solver
 
-from tools import (
+from .tools import (
     create_file_reader_tool,
     create_file_writer_tool,
     create_list_files_and_directories_tool,
@@ -18,7 +18,7 @@ from tools import (
     create_wait_tool,
     create_run_tests_tool_SWE_bench,
 )
-import custom_react_agent
+from . import custom_react_agent
 
 
 @dataclass

@@ -10,9 +10,10 @@ from inspect_ai import Task, task
 from inspect_ai.dataset import MemoryDataset
 from inspect_ai.model import GenerateConfig
 
-from agents import agent_collection_solver
+from multi_agent_eval.environment.agents import agent_collection_solver
 from multi_agent_eval.samples import unique_digits, webserver
-from scorer import multi_agent_scorer
+
+from multi_agent_eval.environment.scorer import multi_agent_scorer
 
 
 @task

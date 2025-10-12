@@ -5,7 +5,7 @@ from inspect_ai.scorer import scorer, accuracy, Score
 from inspect_ai.solver import TaskState
 from inspect_ai.util import sandbox
 
-from constants import SANDBOX_WORKSPACE
+from .constants import SANDBOX_WORKSPACE
 
 
 @scorer(metrics=[accuracy()])
