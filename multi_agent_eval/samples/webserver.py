@@ -11,7 +11,7 @@ from inspect_ai.dataset import Sample, Dataset
 
 from agents import AgentConfig
 
-from constants import project_root
+from constants import project_root, SANDBOX_WORKSPACE
 from more_itertools import chunked
 
 
@@ -48,6 +48,7 @@ def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Dataset
                 id=f"agent_{i}",
                 read_access="ALL",
                 write_access=write_access,
+                working_dir=SANDBOX_WORKSPACE,
                 agent_specific_message=f"""You are responsible for implementing {chunk}.
 Work with other agents to ensure the complete system functions correctly.""",
             )
