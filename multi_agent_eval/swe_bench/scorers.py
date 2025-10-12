@@ -1,3 +1,5 @@
+# This file is directly taken from inspect_evals for simplicity since it can't be added to the requirements
+
 """SWE-bench: Can Language Models Resolve Real-World GitHub Issues?
 
 Carlos E. Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, Karthik Narasimhan

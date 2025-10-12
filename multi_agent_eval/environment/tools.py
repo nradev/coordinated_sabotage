@@ -14,6 +14,7 @@ from swebench.harness.test_spec.python import get_test_directives
 from .constants import SANDBOX_WORKSPACE
 
 
+# TODO consider returning a diff on subsequent file reads?
 def create_file_reader_tool(
     agent_id: str, read_access: List[str] | None = None, working_dir: str | None = None
 ) -> Tool:

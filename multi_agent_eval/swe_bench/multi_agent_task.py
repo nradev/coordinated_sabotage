@@ -22,9 +22,9 @@ from swebench import MAP_REPO_VERSION_TO_SPECS
 
 from multi_agent_eval.environment.agents import AgentConfig, agent_collection_solver
 from multi_agent_eval.environment.tools import summarize_tools
-from swe_bench.swe_bench_tasks import get_remote_docker_image_from_id, get_sandbox_config_file
-from swe_bench.build_images import build_images
-from swe_bench.scorers import swe_bench_scorer
+from swe_bench_tasks import get_remote_docker_image_from_id, get_sandbox_config_file
+from build_images import build_images
+from scorers import swe_bench_scorer
 
 
 logger = logging.getLogger(__name__)
