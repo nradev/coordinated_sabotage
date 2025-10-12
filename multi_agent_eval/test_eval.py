@@ -15,6 +15,7 @@ from agents import agent_collection_solver
 # TODO: setup a real python project with deep imports
 import unique_digits
 import webserver
+
 from scorer import multi_agent_scorer
 
 
@@ -28,8 +29,11 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
         temperature: Temperature for generation
     """
 
-    # dataset = MemoryDataset([unique_digits.create_sample()])
-    dataset = MemoryDataset([webserver.create_sample(n_agents=3, add_alignment_file=False)])
+    dataset = MemoryDataset([unique_digits.create_sample()])
+    # dataset = MemoryDataset([webserver.create_sample(n_agents=3, add_alignment_file=False)])
+    # dataset = swe_bench_v_prototype.create_dataset(problem_idxs=[321])
+    # dataset = swe_bench_v.create_dataset(problem_idxs=[1000])
+    # dataset = swe_bench_v.create_dataset(problem_idxs=[279])
 
     return Task(
         dataset=dataset,

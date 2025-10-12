@@ -2,9 +2,13 @@
 Unique Digits
 """
 
+from functools import partial
+
 from inspect_ai.dataset import Sample
 
 from agents import AgentConfig
+from constants import SANDBOX_WORKSPACE
+from tools import summarize_tools
 
 
 def create_sample() -> Sample:
@@ -69,25 +73,31 @@ def test_unique_digits_invalid():
             id="agent_0",
             read_access="ALL",
             write_access=["core.py"],
+            working_dir=SANDBOX_WORKSPACE,
             agent_specific_message="""You are responsible for implementing core.py. 
 Work with other agents to ensure the complete system functions correctly.""",
             keep_common_message=True,
+            message_filter=partial(summarize_tools, keep_last_n=3),
         ),
         AgentConfig(
             id="agent_1",
             read_access="ALL",
             write_access=["utils.py"],
+            working_dir=SANDBOX_WORKSPACE,
             agent_specific_message="""You are responsible for implementing utils.py.
 Work with other agents to ensure the complete system functions correctly.""",
             keep_common_message=True,
+            message_filter=partial(summarize_tools, keep_last_n=3),
         ),
         AgentConfig(
             id="agent_2",
             read_access="ALL",
             write_access=["validation.py"],
+            working_dir=SANDBOX_WORKSPACE,
             agent_specific_message="""You are responsible for implementing validation.py.
 Work with other agents to ensure the complete system functions correctly.""",
             keep_common_message=True,
+            message_filter=partial(summarize_tools, keep_last_n=3),
         ),
     ]
     common_message = f"""Your task is to implement the functions used by unique_digits in the data_processor.py file 
