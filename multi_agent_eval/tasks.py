@@ -12,7 +12,7 @@ from inspect_ai.dataset import MemoryDataset
 from inspect_ai.model import GenerateConfig
 from inspect_ai.util import message_limit
 
-from agents import agent_collection_solver, single_step_agent
+from agents import agent_collection_solver, forgetful_agent
 from multi_agent_eval.samples import unique_digits
 from scorer import multi_agent_scorer
 
@@ -31,7 +31,7 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
 
     return Task(
         dataset=dataset,
-        solver=as_solver(single_step_agent(), limits=[message_limit(max_messages)]),
+        solver=as_solver(forgetful_agent(), limits=[message_limit(max_messages)]),
         scorer=multi_agent_scorer(),
         config=GenerateConfig(temperature=temperature, max_tokens=2000),
         sandbox="docker",

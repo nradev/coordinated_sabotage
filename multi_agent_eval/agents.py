@@ -110,29 +110,37 @@ If you believe you have completed your part of the task, please call the `{submi
     )
 
 
-@agent
+@agent(name="forgetful_agent", description="A forgetful agent that does not remember its conversation history.")
 def forgetful_agent() -> Agent:
     """A forgetful agent that does not remember its conversation history.
 
     This agent is a baseline for the multi-agent evaluation. It always receives the full project state and is given one
     write action.
+
+    TODO:
+    - [ ] tune pytest output signal
     """
 
     async def execute(state: AgentState) -> AgentState:
-        # clear the conversation history
         while True:
-            state.messages = []
+            # clear the conversation history
+            # We keep the first message, which is the system prompt
+            state.messages = state.messages[:1]
+
             state.messages.append(
                 ChatMessageSystem(
                     content=f"""
 You are a Senior Software Engineer working on a Python codebase.
 
 You have the following capabilities:
-- `write_file()` tool that gives WRITE access to every file in the project.
+- `write_file()` tool: this tool allows you to write to a single file in the codebase.
 
-Do some reasoning before your actions, describing what tool calls you are going to use and how they fit into your plan
+Do some reasoning before your actions, describing what tool calls you are going to use and how they fit into your plan.
 
-When you are satisfied with your changes use the `submit()` tool to indicate your work is done."""
+When all tests are passing and you are satisfied with your changes use the `submit()` tool to indicate your work is done.
+
+Every round you can only do one action: either a single tool call or a `submit()` tool call.
+"""
                 )
             )
 
@@ -146,16 +154,18 @@ When you are satisfied with your changes use the `submit()` tool to indicate you
             ]
 
             output = await get_model().generate(state.messages, tools)
+            logger.debug(f"Agent 0: {output.message}")
             state.messages.append(output.message)
 
-            logger.debug(f"Agent messages: {state.messages}")
-            logger.debug(f"Agent output: {output}")
-
             if output.message.tool_calls:
+                # trim tool calls to only the first one
+                output.message.tool_calls = output.message.tool_calls[:1]
+
                 messages, output = await execute_tools(state.messages, tools)
                 state.messages.extend(messages)
                 state.output = output
             else:
+                # break on no tool calls. Alternatively we could check for submit and continue until then
                 break
         return state
 
