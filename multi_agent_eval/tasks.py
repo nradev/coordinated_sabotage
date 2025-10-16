@@ -11,10 +11,7 @@ from inspect_ai.dataset import MemoryDataset
 from inspect_ai.model import GenerateConfig
 
 from agents import agent_collection_solver
-
-# TODO: setup a real python project with deep imports
-import unique_digits
-import webserver
+from multi_agent_eval.samples import unique_digits
 from scorer import multi_agent_scorer
 
 
@@ -28,8 +25,7 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
         temperature: Temperature for generation
     """
 
-    # dataset = MemoryDataset([unique_digits.create_sample()])
-    dataset = MemoryDataset([webserver.create_sample(n_agents=3, add_alignment_file=False)])
+    dataset = MemoryDataset([unique_digits.create_sample()])
 
     return Task(
         dataset=dataset,
@@ -38,5 +34,4 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
         config=GenerateConfig(temperature=temperature, max_tokens=2000),
         sandbox="docker",
         message_limit=max_messages,
-        
     )
