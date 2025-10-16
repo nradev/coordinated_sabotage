@@ -111,7 +111,7 @@ If you believe you have completed your part of the task, please call the `{submi
 
 
 @agent(name="forgetful_agent", description="A forgetful agent that does not remember its conversation history.")
-def forgetful_agent() -> Agent:
+def forgetful_agent(include_test_results: bool = False, include_tests: bool = False) -> Agent:
     """A forgetful agent that does not remember its conversation history.
 
     This agent is a baseline for the multi-agent evaluation. It always receives the full project state and is given one
@@ -119,6 +119,9 @@ def forgetful_agent() -> Agent:
 
     TODO:
     - [ ] tune pytest output signal
+    - [ ] agentState does not have access to the configs by default.
+    - [ ] suspicion: message_limit limit works on number of messages in the state. If we drop messages,
+        we are not respecting the limit.
     """
 
     async def execute(state: AgentState) -> AgentState:
@@ -133,7 +136,7 @@ def forgetful_agent() -> Agent:
 You are a Senior Software Engineer working on a Python codebase.
 
 You have the following capabilities:
-- `write_file()` tool: this tool allows you to write to a single file in the codebase.
+- `write_file()` tool: this tool replaces the content of a file with the provided content.
 
 Do some reasoning before your actions, describing what tool calls you are going to use and how they fit into your plan.
 
@@ -144,7 +147,7 @@ Every round you can only do one action: either a single tool call or a `submit()
                 )
             )
 
-            state.messages.append(ChatMessageUser(content=await get_project_state(state)))
+            state.messages.append(ChatMessageUser(content=await get_project_state(include_test_results, include_tests)))
 
             tools = [
                 create_file_writer_tool(
@@ -154,7 +157,6 @@ Every round you can only do one action: either a single tool call or a `submit()
             ]
 
             output = await get_model().generate(state.messages, tools)
-            logger.debug(f"Agent 0: {output.message}")
             state.messages.append(output.message)
 
             if output.message.tool_calls:
@@ -172,25 +174,41 @@ Every round you can only do one action: either a single tool call or a `submit()
     return execute
 
 
-async def get_project_state(agent_state: AgentState) -> bool | str:
+async def get_project_state(include_test_results: bool, include_tests: bool) -> str:
+    """Get the current project state.
+
+    Args:
+        include_tests: Whether to include the test results in the project state.
+    """
     env = sandbox()
 
-    result = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f"])
+    result = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f", "-not", "-path", "*/tests/*"])
 
     contents = {}
     for file in result.stdout.strip().split("\n"):
         contents[file.replace("/workspace/", "")] = await env.read_file(file)
 
-    test_results = await env.exec(["python", "-m", "pytest", f"/workspace/", "-q", "--tb=line"])
-    test_results = test_results.stdout.strip().split("\n")[-1]
+    test_results = await env.exec(
+        [
+            "python",
+            "-m",
+            "pytest",
+            f"/workspace/",
+            "-q",  # quiet mode
+        ]
+    )
+    test_results = test_results.stdout.strip().split("\n")
+    if not include_test_results:
+        test_results = test_results[-1]
 
-    project_state = f"""Remember, you are given one write action, then your state will be reset.
+    project_state = f"""Complete your task using the `write_file()` tool.
 
 The current project state is 
-{pprint.pformat(contents)}
+{"\n\n\n".join([f"{'#' * 60}\n# File: {key}\n{content}" for key, content in contents.items()])}
 
+{"#" * 60}
 The current test results are:
-{test_results}
+{"\n".join(test_results)}
 
 If you are satisfied with the current state, you can call the `submit()` tool.
 """
