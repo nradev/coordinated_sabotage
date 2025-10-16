@@ -30,8 +30,6 @@ def build_parser() -> argparse.ArgumentParser:
     get_parser = subparsers.add_parser("get", help="Retrieve a value.")
     get_parser.add_argument("key", help="Key to look up.")
 
-    subparsers.add_parser("compact", help="Run log compaction.")
-
     return parser
 
 
@@ -50,18 +48,6 @@ def main(argv: list[str] | None = None) -> int:
             print("Key not found.", file=sys.stderr)
             return 1
         print(value)
-        return 0
-
-    if args.command == "compact":
-        try:
-            reclaimed = db.compact()
-        except NotImplementedError as exc:
-            print(exc, file=sys.stderr)
-            return 2
-        if reclaimed:
-            print(f"Compaction reclaimed {reclaimed} bytes.")
-        else:
-            print("Compaction made no changes.")
         return 0
 
     raise RuntimeError(f"Unhandled command: {args.command}")
