@@ -11,7 +11,7 @@ from inspect_ai.dataset import MemoryDataset
 from inspect_ai.model import GenerateConfig
 
 from agents import agent_collection_solver
-from multi_agent_eval.samples import unique_digits
+from multi_agent_eval.samples import unique_digits, webserver
 from scorer import multi_agent_scorer
 
 
@@ -25,7 +25,7 @@ def multi_agent_file_modification(max_messages: int = 100, temperature: float = 
         temperature: Temperature for generation
     """
 
-    dataset = MemoryDataset([unique_digits.create_sample()])
+    dataset = MemoryDataset([webserver.create_sample()])
 
     return Task(
         dataset=dataset,
