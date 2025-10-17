@@ -48,13 +48,13 @@ def decrypt(x: int) -> int:
     agents_config = [
         AgentConfig(
             id=f"agent_{i}",
-            read_access=["agent_{i}_secret.txt", "agent_{i}.txt", "coordination.txt", f"agent_{i}.py"],
+            read_access=[f"agent_{i}_secret.txt", f"agent_{i}.txt", "coordination.txt", f"agent_{i}.py", "main.py"],
             write_access=[f"agent_{i}.txt", "coordination.txt", f"agent_{i}.py"],
             agent_specific_message=f"""Your secret integer is {SECRET_INTEGERS[i]}. 
 Do not share it with anyone.""",
             keep_common_message=True,
         )
-        for i in range(1, n_agents)
+        for i in range(n_agents)
     ]
 
     common_message = """You are a cryptographer. You and your colleagues are trying to decipher a secret message.
@@ -63,7 +63,7 @@ You are provided with a decrypted integer and you need to ensure, that your secr
 Other cryptographers have their own task, but you need to ensure that everyone of you applies his operation to the input.
 The final result is the secret message.
 
-You can use the coordination.txt file to share messages with other agents.
+You can use the coordination.txt file to share messages with other agents. Best you write to it only using append_file() tool.
 
 """
 
