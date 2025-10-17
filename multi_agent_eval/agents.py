@@ -9,6 +9,7 @@ from loguru import logger
 
 from .tools import (
     create_done_tool,
+    create_file_append_tool,
     create_file_reader_tool,
     create_file_writer_tool,
     create_list_files_tool,
@@ -59,6 +60,7 @@ def create_agent(
 You have the following capabilities:
 - `read_file()` tool that gives READ access to the following files in the repository: {"All files" if read_access is None else read_access}
 - `write_file()` tool that gives WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
+- `append_file()` tool that appends content to the same WRITE-access files.
 - `list_files()` tool that gives you a list of all Python files in the repository.
 - `wait()` tool that allows you to wait for other agents to make changes to their files in case your implementation depends on their part of the task .
 - `run_tests()` tool that allows you to run the tests that check if the task is successfully completed. 
@@ -89,6 +91,7 @@ If you believe you have completed your part of the task, please call the `{submi
             # validators=[static_safety_check],
             # modifiers=[sanitize_content],
         ),
+        create_file_append_tool(agent_id, write_access),
         create_list_files_tool(agent_id),
         create_wait_tool(agent_id),
         create_run_tests_tool(agent_id),

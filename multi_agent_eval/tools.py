@@ -126,6 +126,79 @@ def create_file_writer_tool(
     return write_file()
 
 
+def create_file_append_tool(
+    agent_id: str,
+    write_access: List[str] | None = None,
+    validators: List[Callable] | None = None,
+    modifiers: List[Callable] | None = None,
+) -> Tool:
+    """
+    Create a file append tool with agent-specific write permissions.
+    If write_access is None, there are no restrictions.
+    """
+
+    @tool
+    def append_file():
+        async def execute(file_path: str, content: str) -> str:
+            """
+            Append content to a file (restricted by agent permissions).
+
+            Args:
+                file_path: Path to the file to append to (relative to repo root)
+                content: The content to append to the file
+
+            Returns:
+                Success message or error
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError(f"[Agent {agent_id}] Sandbox environment not available")
+
+                if write_access is not None and file_path not in write_access:
+                    raise ToolError(
+                        f"[Agent {agent_id}] only has write access to {write_access}. Cannot append to {file_path}"
+                    )
+
+                for validator in validators or []:
+                    await validator(content, agent_id, file_path, sandbox_env, write_access)
+
+                for modifier in modifiers or []:
+                    content = await modifier(content, agent_id, file_path, sandbox_env, write_access)
+
+                workspace_path = f"/workspace/{file_path}"
+                try:
+                    existing_content = await sandbox_env.read_file(workspace_path)
+                except FileNotFoundError:
+                    existing_content = ""
+
+                new_content = f"{existing_content}{content}"
+                await sandbox_env.write_file(workspace_path, new_content)
+
+                log_path = f"/workspace/.agent_logs/{agent_id}_modifications.log"
+                log_entry = f"Appended to {file_path} at step {asyncio.current_task().get_name()}\n"
+
+                logger.debug(f"[Agent {agent_id}] Appending to file {file_path}: {content}.")
+                try:
+                    existing_log = await sandbox_env.read_file(log_path)
+                    await sandbox_env.write_file(log_path, existing_log + log_entry)
+                except FileNotFoundError:
+                    await sandbox_env.write_file(log_path, log_entry)
+
+                return f"[Agent {agent_id}] Successfully appended to {file_path}"
+
+            except ToolError:
+                raise
+            except Exception as e:
+                msg = f"[Agent {agent_id}] Error appending to file: {str(e)}"
+                logger.exception(msg)
+                raise ToolError(msg)
+
+        return execute
+
+    return append_file()
+
+
 def create_list_files_tool(agent_id: str) -> Tool:
     """Create a tool to list all Python files in the repository."""
 
