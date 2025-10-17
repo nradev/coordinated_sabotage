@@ -2,9 +2,10 @@ import asyncio
 from dataclasses import dataclass
 from typing import Callable, Dict, List
 
-from inspect_ai.agent import Agent, AgentAttempts, AgentPrompt, AgentState, react, run
-from inspect_ai.model import ChatMessageUser
+from inspect_ai.agent import Agent, AgentAttempts, AgentPrompt, AgentState, agent, as_solver, react, run
+from inspect_ai.model import ChatMessageSystem, ChatMessageUser
 from inspect_ai.solver import Generate, Solver, TaskState, solver
+from loguru import logger
 
 from .tools import (
     create_done_tool,
@@ -14,42 +15,6 @@ from .tools import (
     create_run_tests_tool,
     create_wait_tool,
 )
-
-
-@dataclass(frozen=True)
-class RegisteredSolver:
-    name: str
-    factory: Callable[[int], Solver]
-    description: str
-
-
-def _build_agent_collection_solver(max_messages: int) -> Solver:
-    # The agent collection solver already returns a Solver via the decorator.
-    return agent_collection_solver()
-
-
-SOLVERS: Dict[str, RegisteredSolver] = {
-    "multi": RegisteredSolver(
-        name="multi",
-        factory=_build_agent_collection_solver,
-        description="Multi-agent collaborative solver.",
-    ),
-}
-
-
-def get_solver(name: str, *, max_messages: int) -> Solver:
-    """Return a solver instance registered under ``name``."""
-    try:
-        registered = SOLVERS[name]
-    except KeyError as exc:
-        available = ", ".join(sorted(SOLVERS))
-        raise KeyError(f"Unknown solver '{name}'. Available solvers: {available}") from exc
-    return registered.factory(max_messages)
-
-
-def list_solvers() -> List[RegisteredSolver]:
-    """Expose registered solvers for discovery."""
-    return list(SOLVERS.values())
 
 
 @dataclass
@@ -183,3 +148,66 @@ def agent_collection_solver(
         return state
 
     return solve
+
+
+@agent
+def debug_submit_agent() -> Agent:
+    """Debug agent that immediately calls submit tool."""
+
+    async def execute(state: AgentState) -> AgentState:
+        """Just submit immediately for debugging."""
+        logger.debug("Debug agent submitting.")
+        state.messages.append(ChatMessageSystem(content="This is just a debug agent. Submitting."))
+
+        return state
+
+    return execute
+
+
+@dataclass(frozen=True)
+class RegisteredSolver:
+    name: str
+    factory: Callable[[int], Solver]
+    description: str
+
+
+SOLVERS: Dict[str, RegisteredSolver] = {}
+
+
+def register_solver(name: str, *, description: str) -> Callable[[Callable[[int], Solver]], Callable[[int], Solver]]:
+    """Register a solver factory under ``name`` using a decorator."""
+
+    def decorator(factory: Callable[[int], Solver]) -> Callable[[int], Solver]:
+        if name in SOLVERS:
+            raise ValueError(f"Solver '{name}' already registered")
+        SOLVERS[name] = RegisteredSolver(name=name, factory=factory, description=description)
+        return factory
+
+    return decorator
+
+
+@register_solver(name="multi", description="Multi-agent collaborative solver.")
+def _build_agent_collection_solver(max_messages: int) -> Solver:
+    # The agent collection solver already returns a Solver via the decorator.
+    return agent_collection_solver()
+
+
+@register_solver(name="debug", description="Debug solver that immediately calls submit tool.")
+def _build_debug_solver(max_messages: int) -> Solver:
+    del max_messages  # unused, but kept for a consistent decorator signature
+    return as_solver(debug_submit_agent())
+
+
+def get_solver(name: str, *, max_messages: int) -> Solver:
+    """Return a solver instance registered under ``name``."""
+    try:
+        registered = SOLVERS[name]
+    except KeyError as exc:
+        available = ", ".join(sorted(SOLVERS))
+        raise KeyError(f"Unknown solver '{name}'. Available solvers: {available}") from exc
+    return registered.factory(max_messages)
+
+
+def list_solvers() -> List[RegisteredSolver]:
+    """Expose registered solvers for discovery."""
+    return list(SOLVERS.values())

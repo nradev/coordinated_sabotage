@@ -7,7 +7,7 @@ from inspect_ai import eval as run_eval
 from typing_extensions import Annotated
 
 from multi_agent_eval.agents import list_solvers
-from multi_agent_eval.samples import list_datasets
+from multi_agent_eval.samples.registry import list_samples
 from multi_agent_eval.tasks import (
     multi_agent_file_modification,
 )
@@ -27,16 +27,14 @@ def run(
     dataset: Annotated[
         str,
         typer.Option(
-            "--dataset",
-            "-d",
-            help="Dataset to evaluate. Available options:\n" + _format_registry_entries(list_datasets()),
+            "--sample",
+            help="Sample to evaluate. Available options:\n" + _format_registry_entries(list_samples()),
         ),
     ] = "unique_digits",
     solver: Annotated[
         str,
         typer.Option(
             "--solver",
-            "-s",
             help="Solver to use. Available options:\n" + _format_registry_entries(list_solvers()),
         ),
     ] = "multi",

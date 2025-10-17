@@ -9,28 +9,29 @@ options, but the builder works with any compatible dataset or solver.
 
 from __future__ import annotations
 
-from typing import Callable
+from pathlib import Path
 
 from inspect_ai import Task, task
-from inspect_ai.dataset import Dataset
 from inspect_ai.model import GenerateConfig
-from inspect_ai.solver import Solver
+from loguru import logger
 
 from multi_agent_eval.agents import get_solver
-from multi_agent_eval.samples import get_dataset
+from multi_agent_eval.samples import get_sample
 from multi_agent_eval.scorer import multi_agent_scorer
 
-DatasetFactory = Callable[[], Dataset]
-SolverFactory = Callable[[int], Solver]
-
-# TODO: clean-up: move dataset and solver registry to the dedicated module and add a register-decorator
+# TODO: `uv run inspect eval` does not lod run.py -> moving the log configuration there does not have an effect.
+# For now I will put it here as this module is always imported.
+_LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+logger.add(_LOG_DIR / "eval_{time}.log", level="DEBUG")
 
 
 @task
 def multi_agent_file_modification(
     *,
-    dataset: str = "unique_digits",
-    solver: str = "multi",
+    sample: str = "unique_digits",
+    dataset: str | None = None,  # TODO: implement dataset support to distinguish between sample and dataset
+    solver: str = "debug",
     max_messages: int = 100,
     temperature: float = 0.7,
     max_tokens: int = 2000,
@@ -42,7 +43,7 @@ def multi_agent_file_modification(
     Callers can override the dataset or solver by specifying the corresponding registry keys.
     """
 
-    dataset = get_dataset(dataset)
+    dataset = get_sample(sample).as_dataset()
     solver = get_solver(solver, max_messages=max_messages)
 
     return Task(

@@ -8,10 +8,11 @@ access to only one specific file but read access to all files.
 
 from inspect_ai.dataset import Sample
 
-
 from ..agents import AgentConfig
+from .registry import register_sample
 
 
+@register_sample(name="unique_digits", description="Unique digits multi-file refactoring exercise.")
 def create_sample() -> Sample:
     """Create dataset with multi-agent file modification tasks."""
     files_content = {
@@ -95,7 +96,7 @@ Work with other agents to ensure the complete system functions correctly.""",
             keep_common_message=True,
         ),
     ]
-    common_message = f"""Your task is to implement the functions used by unique_digits in the data_processor.py file 
+    common_message = """Your task is to implement the functions used by unique_digits in the data_processor.py file 
 such that unique_digits performs according to the specification in its docstring.
 
 1. In core.py: Implement get_digits() to extract all digits from strings, integers, and floats
