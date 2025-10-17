@@ -52,6 +52,16 @@ uv run inspect eval multi_agent_eval/test_eval.py --model anthropic/claude-3-opu
 
 Evaluation results will be saved in the `logs/` directory.
 
+### CLI Runner
+Use the Typer-based CLI to run registered sample and solvers:
+```bash
+uv run python -m multi_agent_eval.run run --sample unique_digits --solver multi --model openai/gpt-4o-mini
+```
+List the available options:
+```bash
+uv run python -m multi_agent_eval.run --help
+```
+
 ## Development
 
 ### Code Quality
