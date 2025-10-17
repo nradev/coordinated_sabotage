@@ -2,11 +2,9 @@ import asyncio
 from dataclasses import dataclass
 from typing import Callable, Dict, List
 
-from inspect_ai.agent import Agent, AgentAttempts, AgentPrompt, AgentState, agent, as_solver, react, run
-from inspect_ai.model import ChatMessageSystem, ChatMessageUser, execute_tools, get_model
+from inspect_ai.agent import Agent, AgentAttempts, AgentPrompt, AgentState, react, run
+from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import Generate, Solver, TaskState, solver
-from inspect_ai.util import message_limit, sandbox
-from loguru import logger
 
 from .tools import (
     create_done_tool,
@@ -25,22 +23,12 @@ class RegisteredSolver:
     description: str
 
 
-def _build_forgetful_solver(max_messages: int) -> Solver:
-    agent = forgetful_agent(include_test_results=True, include_tests=False)
-    return as_solver(agent, limits=[message_limit(max_messages)])
-
-
 def _build_agent_collection_solver(max_messages: int) -> Solver:
     # The agent collection solver already returns a Solver via the decorator.
     return agent_collection_solver()
 
 
 SOLVERS: Dict[str, RegisteredSolver] = {
-    "forgetful": RegisteredSolver(
-        name="forgetful",
-        factory=_build_forgetful_solver,
-        description="Single forgetful agent baseline.",
-    ),
     "multi": RegisteredSolver(
         name="multi",
         factory=_build_agent_collection_solver,

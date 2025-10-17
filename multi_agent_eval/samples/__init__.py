@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from inspect_ai.dataset import Dataset, MemoryDataset
 
-from multi_agent_eval.samples import append_log_db, unique_digits
+from multi_agent_eval.samples import unique_digits, webserver
 
 
 @dataclass(frozen=True)
@@ -26,7 +26,7 @@ DATASETS: dict[str, RegisteredDataset] = {
     ),
     "append_log_db": RegisteredDataset(
         name="append_log_db",
-        factory=lambda: _memory_dataset_from_sample(append_log_db.create_sample),
+        factory=lambda: _memory_dataset_from_sample(webserver.create_sample),
         description="Append-only log database compaction exercise.",
     ),
 }

@@ -39,7 +39,7 @@ def run(
             "-s",
             help="Solver to use. Available options:\n" + _format_registry_entries(list_solvers()),
         ),
-    ] = "forgetful",
+    ] = "multi",
     temperature: Annotated[
         float,
         typer.Option("--temperature", "-t", help="Model temperature used during generation."),
