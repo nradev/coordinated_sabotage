@@ -8,7 +8,7 @@ from inspect_ai.agent import AgentAttempts, Agent, react, AgentState, run, Agent
 from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import solver, TaskState, Generate, Solver
 
-from tools import (
+from .tools import (
     create_file_reader_tool,
     create_file_writer_tool,
     create_list_files_tool,
@@ -16,7 +16,7 @@ from tools import (
     create_done_tool,
     create_wait_tool,
 )
-from code_validator import sanitize_content, static_safety_check
+from .code_validator import sanitize_content, static_safety_check
 
 
 @dataclass

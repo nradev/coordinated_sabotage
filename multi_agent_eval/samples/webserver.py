@@ -9,9 +9,9 @@ access to only one specific file but read access to all files.
 from pathlib import Path
 from inspect_ai.dataset import Sample, Dataset
 
-from agents import AgentConfig
+from ..agents import AgentConfig
 
-from constants import project_root
+from ..constants import project_root
 from more_itertools import chunked
 
 

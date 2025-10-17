@@ -19,9 +19,9 @@ from inspect_ai.model import GenerateConfig
 from inspect_ai.solver import Solver
 from inspect_ai.util import message_limit
 
-from agents import agent_collection_solver, forgetful_agent
-from multi_agent_eval.samples import append_log_db, unique_digits
-from scorer import multi_agent_scorer
+from .agents import agent_collection_solver, forgetful_agent
+from .samples import unique_digits, webserver, append_log_db
+from .scorer import multi_agent_scorer
 
 DatasetFactory = Callable[[], Dataset]
 SolverFactory = Callable[[int], Solver]

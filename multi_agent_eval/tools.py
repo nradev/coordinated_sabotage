@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import Optional, List, Callable
 
 from inspect_ai.agent import AgentSubmit
@@ -7,10 +8,9 @@ from inspect_ai.util import sandbox
 from loguru import logger
 
 # TODO: this should be defined somewhere else, but then it is not triggered -> good enough for now
-logger.add(
-    "../logs/eval_{time}.log",
-    level="DEBUG",
-)
+_LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+logger.add(_LOG_DIR / "eval_{time}.log", level="DEBUG")
 
 
 def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None) -> Tool:
