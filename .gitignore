@@ -246,3 +246,6 @@ htmlcov/
 # Documentation builds
 docs/_build/
 site/
+
+# Remove our docker workspace 
+workspace/
