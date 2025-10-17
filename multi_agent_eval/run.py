@@ -24,7 +24,7 @@ def _format_registry_entries(entries) -> str:
 
 @app.command()
 def run(
-    dataset: Annotated[
+    sample: Annotated[
         str,
         typer.Option(
             "--sample",
@@ -56,7 +56,7 @@ def run(
     """
 
     task = multi_agent_file_modification(
-        dataset=dataset,
+        sample=sample,
         solver=solver,
         temperature=temperature,
         max_messages=max_messages,
