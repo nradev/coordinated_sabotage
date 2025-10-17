@@ -93,3 +93,21 @@ git checkout multi_agent_timeline
 source .venv/bin/activate && inspect view --log-dir ~/code/coordinated_sabotage_test/logs
 ```
 
+## Tracking Evaluations with Weights & Biases
+
+The [`inspect-wandb` tutorial](https://inspect-wandb.readthedocs.io/en/latest/tutorial.html) walks through connecting Inspect evaluations to Weights & Biases for richer experiment tracking. 
+
+```bash
+# set your WANDB_API_KEY
+export WANDB_API_KEY="your-api-key"
+
+# setup wand
+wandb init
+wandb login
+
+# run the evaluation; this will automatically log your run
+uv run inspect eval multi_agent_eval/test_eval.py
+```
+
+Refer to the tutorial for advanced configuration options such as grouping runs, attaching custom metadata, or streaming live metrics.
+
