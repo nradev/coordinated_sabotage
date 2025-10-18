@@ -5,5 +5,5 @@ from multi_agent_eval.tasks import multi_agent_file_modification
 if __name__ == "__main__":
     eval(
         tasks=multi_agent_file_modification,
-        model="ollama/gpt-oss:20b",
+        model="openai/gpt-4o-mini",
     )

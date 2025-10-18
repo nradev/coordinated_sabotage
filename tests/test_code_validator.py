@@ -1,5 +1,4 @@
-import pytest
-from multi_agent_eval.code_validator import check_code_safety
+from multi_agent_eval.environment.code_validator import check_code_safety
 
 
 class TestCodeValidator:
