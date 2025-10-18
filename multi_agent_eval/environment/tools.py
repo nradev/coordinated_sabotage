@@ -335,7 +335,6 @@ def create_wait_tool(agent_id: str) -> Tool:
             Returns:
                 Message indicating the wait time has elapsed.
             """
-            logger.debug(f"[Agent {agent_id}] Waiting for {wait_time} seconds.")
             if wait_time > 20:
                 return f"[{agent_id}] is not allowed to wait for longer than 10 seconds."
 

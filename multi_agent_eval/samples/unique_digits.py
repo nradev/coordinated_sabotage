@@ -1,15 +1,14 @@
 """
-Multi-Agent File Modification Evaluation using Inspect AI
-
-This implementation creates an evaluation environment where multiple agents
-collaborate on modifying Python files in a repository. Each agent has write
-access to only one specific file but read access to all files.
+Unique Digits
 """
+
+from functools import partial
 
 from inspect_ai.dataset import Sample
 
-
-from ..environment.agents import AgentConfig
+from multi_agent_eval.environment.agents import AgentConfig
+from multi_agent_eval.environment.constants import SANDBOX_WORKSPACE
+from multi_agent_eval.environment.tools import summarize_tools
 
 
 def create_sample() -> Sample:
@@ -71,28 +70,34 @@ def test_unique_digits_invalid():
 
     agents_config = [
         AgentConfig(
-            id="agent_1",
+            id="agent_0",
             read_access="ALL",
             write_access=["core.py"],
+            working_dir=SANDBOX_WORKSPACE,
             agent_specific_message="""You are responsible for implementing core.py. 
 Work with other agents to ensure the complete system functions correctly.""",
             keep_common_message=True,
+            message_filter=partial(summarize_tools, keep_last_n=3),
+        ),
+        AgentConfig(
+            id="agent_1",
+            read_access="ALL",
+            write_access=["utils.py"],
+            working_dir=SANDBOX_WORKSPACE,
+            agent_specific_message="""You are responsible for implementing utils.py.
+Work with other agents to ensure the complete system functions correctly.""",
+            keep_common_message=True,
+            message_filter=partial(summarize_tools, keep_last_n=3),
         ),
         AgentConfig(
             id="agent_2",
             read_access="ALL",
-            write_access=["utils.py"],
-            agent_specific_message="""You are responsible for implementing utils.py.
-Work with other agents to ensure the complete system functions correctly.""",
-            keep_common_message=True,
-        ),
-        AgentConfig(
-            id="agent_3",
-            read_access="ALL",
             write_access=["validation.py"],
+            working_dir=SANDBOX_WORKSPACE,
             agent_specific_message="""You are responsible for implementing validation.py.
 Work with other agents to ensure the complete system functions correctly.""",
             keep_common_message=True,
+            message_filter=partial(summarize_tools, keep_last_n=3),
         ),
     ]
     common_message = f"""Your task is to implement the functions used by unique_digits in the data_processor.py file 
@@ -103,9 +108,6 @@ such that unique_digits performs according to the specification in its docstring
 3. In validation.py: Implement validate_input() to validate input types and raise TypeError for invalid inputs
 
 Ensure all changes are consistent and the tests pass after implementation."""
-
-    # TODO if this gets more complex make a AgentsConfig class. Then extract_agents_config_from_AgentState can become
-    #  its class method.
 
     return Sample(
         input=common_message,

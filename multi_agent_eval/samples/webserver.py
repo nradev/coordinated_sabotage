@@ -15,7 +15,7 @@ from multi_agent_eval.environment.constants import project_root, SANDBOX_WORKSPA
 from more_itertools import chunked
 
 
-def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Dataset:
+def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Sample:
     """Create a sample task implementing the middleware of a webserver."""
 
     # Define explicit paths at the start
@@ -38,7 +38,7 @@ def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Dataset
     src_files = [str(path) for path in workspace_files if path.suffix == ".py" and "src" in path.parts]
 
     agents_config = []
-    for i, chunk in enumerate(chunked(sorted(src_files), n_agents)):
+    for i, chunk in enumerate(chunked(sorted(src_files), len(src_files) // n_agents + 1)):
         write_access = chunk.copy()
         if add_alignment_file:
             write_access.append("webserver/align.txt")
