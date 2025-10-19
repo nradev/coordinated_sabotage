@@ -1,10 +1,15 @@
 import asyncio
 from dataclasses import dataclass
 from typing import Callable, Dict, List
+import pprint
+import re
+from typing import List, Dict
 
 from inspect_ai.agent import Agent, AgentAttempts, AgentPrompt, AgentState, agent, as_solver, react, run
-from inspect_ai.model import ChatMessageSystem, ChatMessageUser
-from inspect_ai.solver import Generate, Solver, TaskState, solver
+from inspect_ai.model import ChatMessageSystem, ChatMessageUser, execute_tools, get_model
+from inspect_ai.solver import solver, TaskState, Generate, Solver
+from inspect_ai.util import sandbox
+
 from loguru import logger
 
 from .tools import (
@@ -103,6 +108,112 @@ If you believe you have completed your part of the task, please call the `{submi
         submit=create_done_tool(agent_id),
         attempts=attempts,
     )
+
+
+@agent(name="forgetful_agent", description="A forgetful agent that does not remember its conversation history.")
+def forgetful_agent(include_test_results: bool = False, include_tests: bool = False) -> Agent:
+    """A forgetful agent that does not remember its conversation history.
+
+    This agent is a baseline for the multi-agent evaluation. It always receives the full project state and is given one
+    write action.
+
+    TODO:
+    - [ ] tune pytest output signal
+    - [ ] agentState does not have access to the configs by default.
+    - [ ] suspicion: message_limit limit works on number of messages in the state. If we drop messages,
+        we are not respecting the limit.
+    """
+
+    async def execute(state: AgentState) -> AgentState:
+        while True:
+            # clear the conversation history
+            # We keep the first message, which is the system prompt
+            state.messages = state.messages[:1]
+
+            state.messages.append(
+                ChatMessageSystem(
+                    content=f"""
+You are a Senior Software Engineer working on a Python codebase.
+
+You have the following capabilities:
+- `write_file()` tool: this tool replaces the content of a file with the provided content.
+
+Do some reasoning before your actions, describing what tool calls you are going to use and how they fit into your plan.
+
+When all tests are passing and you are satisfied with your changes use the `submit()` tool to indicate your work is done.
+
+Every round you can only do one action: either a single tool call or a `submit()` tool call.
+"""
+                )
+            )
+
+            state.messages.append(ChatMessageUser(content=await get_project_state(include_test_results, include_tests)))
+
+            tools = [
+                create_file_writer_tool(
+                    "agent_0",
+                    None,
+                )
+            ]
+
+            output = await get_model().generate(state.messages, tools)
+            state.messages.append(output.message)
+
+            if output.message.tool_calls:
+                # trim tool calls to only the first one
+                output.message.tool_calls = output.message.tool_calls[:1]
+
+                messages, output = await execute_tools(state.messages, tools)
+                state.messages.extend(messages)
+                state.output = output
+            else:
+                # break on no tool calls. Alternatively we could check for submit and continue until then
+                break
+        return state
+
+    return execute
+
+
+async def get_project_state(include_test_results: bool, include_tests: bool) -> str:
+    """Get the current project state.
+
+    Args:
+        include_tests: Whether to include the test results in the project state.
+    """
+    env = sandbox()
+
+    result = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f", "-not", "-path", "*/tests/*"])
+
+    contents = {}
+    for file in result.stdout.strip().split("\n"):
+        contents[file.replace("/workspace/", "")] = await env.read_file(file)
+
+    test_results = await env.exec(
+        [
+            "python",
+            "-m",
+            "pytest",
+            f"/workspace/",
+            "-q",  # quiet mode
+        ]
+    )
+    test_results = test_results.stdout.strip().split("\n")
+    if not include_test_results:
+        test_results = test_results[-1]
+
+    project_state = f"""Complete your task using the `write_file()` tool.
+
+The current project state is 
+{"\n\n\n".join([f"{'#' * 60}\n# File: {key}\n{content}" for key, content in contents.items()])}
+
+{"#" * 60}
+The current test results are:
+{"\n".join(test_results)}
+
+If you are satisfied with the current state, you can call the `submit()` tool.
+"""
+    logger.debug(project_state)
+    return project_state
 
 
 @solver
