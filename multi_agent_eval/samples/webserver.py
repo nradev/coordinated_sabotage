@@ -13,7 +13,7 @@ from more_itertools import chunked
 
 from ..agents import AgentConfig
 from ..constants import project_root
-from .registry import register_sample
+from ._registry import register_sample
 
 
 @register_sample(name="webserver", description="Web server middleware integration exercise.")

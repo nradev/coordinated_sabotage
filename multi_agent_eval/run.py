@@ -7,7 +7,7 @@ from inspect_ai import eval as run_eval
 from typing_extensions import Annotated
 
 from multi_agent_eval.agents import list_solvers
-from multi_agent_eval.samples.registry import list_samples
+from multi_agent_eval.samples._registry import list_samples
 from multi_agent_eval.tasks import (
     multi_agent_file_modification,
 )

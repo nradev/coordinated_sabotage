@@ -9,10 +9,10 @@ access to only one specific file but read access to all files.
 from inspect_ai.dataset import Sample
 
 from ..agents import AgentConfig
-from .registry import register_sample
+from ._registry import register_sample
 
 
-@register_sample(name="unique_digits", description="Unique digits multi-file refactoring exercise.")
+@register_sample(name="unique-digits", description="Unique digits multi-file refactoring exercise.")
 def create_sample() -> Sample:
     """Create dataset with multi-agent file modification tasks."""
     files_content = {

@@ -1,15 +1,11 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Callable, Dict, List
-import pprint
-import re
-from typing import List, Dict
+from typing import Callable, Dict, List, TypeAlias
 
 from inspect_ai.agent import Agent, AgentAttempts, AgentPrompt, AgentState, agent, as_solver, react, run
 from inspect_ai.model import ChatMessageSystem, ChatMessageUser, execute_tools, get_model
-from inspect_ai.solver import solver, TaskState, Generate, Solver
+from inspect_ai.solver import Generate, Solver, TaskState, solver
 from inspect_ai.util import sandbox
-
 from loguru import logger
 
 from .tools import (
@@ -132,7 +128,7 @@ def forgetful_agent(include_test_results: bool = False, include_tests: bool = Fa
 
             state.messages.append(
                 ChatMessageSystem(
-                    content=f"""
+                    content="""
 You are a Senior Software Engineer working on a Python codebase.
 
 You have the following capabilities:
@@ -182,7 +178,7 @@ async def get_project_state(include_test_results: bool, include_tests: bool) -> 
     """
     env = sandbox()
 
-    result = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f", "-not", "-path", "*/tests/*"])
+    result = await env.exec(["find", "/workspace/", "-name", "*.py", "-type", "f", "-not", "-path", "*/tests/*"])
 
     contents = {}
     for file in result.stdout.strip().split("\n"):
@@ -193,7 +189,7 @@ async def get_project_state(include_test_results: bool, include_tests: bool) -> 
             "python",
             "-m",
             "pytest",
-            f"/workspace/",
+            "/workspace/",
             "-q",  # quiet mode
         ]
     )
@@ -208,7 +204,7 @@ The current project state is
 
 {"#" * 60}
 The current test results are:
-{"\n".join(test_results)}
+{test_results}
 
 If you are satisfied with the current state, you can call the `submit()` tool.
 """
@@ -275,20 +271,23 @@ def debug_submit_agent() -> Agent:
     return execute
 
 
+SolverFactory: TypeAlias = Callable[[], Solver]
+
+
 @dataclass(frozen=True)
 class RegisteredSolver:
     name: str
-    factory: Callable[[int], Solver]
+    factory: SolverFactory
     description: str
 
 
 SOLVERS: Dict[str, RegisteredSolver] = {}
 
 
-def register_solver(name: str, *, description: str) -> Callable[[Callable[[int], Solver]], Callable[[int], Solver]]:
+def register_solver(name: str, *, description: str) -> Callable[[SolverFactory], SolverFactory]:
     """Register a solver factory under ``name`` using a decorator."""
 
-    def decorator(factory: Callable[[int], Solver]) -> Callable[[int], Solver]:
+    def decorator(factory: SolverFactory) -> SolverFactory:
         if name in SOLVERS:
             raise ValueError(f"Solver '{name}' already registered")
         SOLVERS[name] = RegisteredSolver(name=name, factory=factory, description=description)
@@ -298,25 +297,28 @@ def register_solver(name: str, *, description: str) -> Callable[[Callable[[int],
 
 
 @register_solver(name="multi", description="Multi-agent collaborative solver.")
-def _build_agent_collection_solver(max_messages: int) -> Solver:
-    # The agent collection solver already returns a Solver via the decorator.
+def _build_agent_collection_solver() -> Solver:
     return agent_collection_solver()
 
 
 @register_solver(name="debug", description="Debug solver that immediately calls submit tool.")
-def _build_debug_solver(max_messages: int) -> Solver:
-    del max_messages  # unused, but kept for a consistent decorator signature
+def _build_debug_solver() -> Solver:
     return as_solver(debug_submit_agent())
 
 
-def get_solver(name: str, *, max_messages: int) -> Solver:
+@register_solver(name="forgetful", description="Forgetful agent that does not remember its conversation history.")
+def _build_forgetful_solver() -> Solver:
+    return as_solver(forgetful_agent())
+
+
+def get_solver(name: str) -> Solver:
     """Return a solver instance registered under ``name``."""
     try:
         registered = SOLVERS[name]
     except KeyError as exc:
         available = ", ".join(sorted(SOLVERS))
         raise KeyError(f"Unknown solver '{name}'. Available solvers: {available}") from exc
-    return registered.factory(max_messages)
+    return registered.factory()
 
 
 def list_solvers() -> List[RegisteredSolver]:

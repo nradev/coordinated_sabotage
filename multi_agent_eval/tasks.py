@@ -44,7 +44,7 @@ def multi_agent_file_modification(
     """
 
     dataset = get_sample(sample).as_dataset()
-    solver = get_solver(solver, max_messages=max_messages)
+    solver = get_solver(solver)
 
     return Task(
         dataset=dataset,
