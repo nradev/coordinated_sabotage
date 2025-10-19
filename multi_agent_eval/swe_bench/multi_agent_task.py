@@ -25,6 +25,7 @@ from multi_agent_eval.environment.tools import summarize_tools
 from swe_bench_tasks import get_remote_docker_image_from_id, get_sandbox_config_file
 from build_images import build_images
 from scorers import swe_bench_scorer
+from setup_permissions import setup_file_permissions
 
 
 logger = logging.getLogger(__name__)
@@ -288,6 +289,7 @@ def swe_bench(
     allow_internet: bool = False,
     sandbox_config_template_file: str | None = None,
     solo_agent: bool = False,
+    tools_type: Literal["custom", "bash"] = "custom",
 ) -> Task:
     """Returns a Task, representing an evaluation on SWE-bench.
 
@@ -371,6 +373,31 @@ def swe_bench(
             use_remote_images=pull_remote_images_if_available,
         )
 
+        # If using bash tools, setup file permissions per agent
+        if tools_type == "bash":
+            from docker.client import DockerClient
+
+            docker_client = DockerClient.from_env()
+
+            # Create restricted images for each instance
+            for sample in samples:
+                instance_id = str(sample.id)
+                base_image = id_to_docker_image_map[instance_id]
+                agent_configs = sample.metadata["agents_config"]
+
+                # Setup file permissions for this instance's agents
+                restricted_image = setup_file_permissions(
+                    docker_client=docker_client,
+                    image_name=base_image,
+                    agent_configs=agent_configs,
+                    working_dir="/testbed",
+                )
+
+                # Update the image map to use the restricted image
+                id_to_docker_image_map[instance_id] = restricted_image
+
+            logger.info(f"Set up file permissions for {len(samples)} instances")
+
         # Replace docker_image_from_id function with authoritative source
         def get_docker_image(instance_id: str) -> str:
             return id_to_docker_image_map.get(instance_id, "")
@@ -393,7 +420,11 @@ def swe_bench(
     return Task(
         dataset=samples,
         setup=env_setup(),
-        solver=solver or agent_collection_solver(test_tool_func_type="swe_bench"),
+        solver=solver
+        or agent_collection_solver(
+            tools_type=tools_type,
+            test_tool_func_type="swe_bench",
+        ),
         epochs=epochs,
         scorer=scorer or swe_bench_scorer(),
         message_limit=80,
