@@ -1,16 +1,10 @@
 import asyncio
-from typing import Optional, List, Callable
+from typing import Callable, List, Optional
 
 from inspect_ai.agent import AgentSubmit
-from inspect_ai.tool import Tool, tool, ToolError
+from inspect_ai.tool import Tool, ToolError, tool
 from inspect_ai.util import sandbox
 from loguru import logger
-
-# TODO: this should be defined somewhere else, but then it is not triggered -> good enough for now
-logger.add(
-    "../logs/eval_{time}.log",
-    level="DEBUG",
-)
 
 
 def create_file_reader_tool(agent_id: str, read_access: List[str] | None = None) -> Tool:

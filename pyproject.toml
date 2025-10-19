@@ -16,6 +16,7 @@ dependencies = [
     "more-itertools>=10.8.0",
     "openai>=1.107.2",
     "pytest>=8.4.2",
+    "typer>=0.19.2",
 ]
 
 [tool.hatch.build.targets.wheel]

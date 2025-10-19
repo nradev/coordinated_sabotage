@@ -1,44 +1,56 @@
 """
-Multi-Agent File Modification Evaluation using Inspect AI
+Utilities for constructing Inspect AI tasks used in the multi-agent evaluation.
 
-This implementation creates an evaluation environment where multiple agents
-collaborate on modifying Python files in a repository. Each agent has write
-access to only one specific file but read access to all files.
+The module now exposes a task builder that allows callers to inject both the
+dataset and solver implementations. Convenience registries are provided so
+command-line tooling (and downstream users) can select from the built-in
+options, but the builder works with any compatible dataset or solver.
 """
 
+from __future__ import annotations
+
+from pathlib import Path
+
 from inspect_ai import Task, task
-from inspect_ai.agent import as_solver
-from inspect_ai.dataset import MemoryDataset
 from inspect_ai.model import GenerateConfig
-from inspect_ai.util import message_limit
+from loguru import logger
 
-from agents import agent_collection_solver, forgetful_agent
-from inspect_ai.dataset import MemoryDataset
-from inspect_ai.model import GenerateConfig
+from multi_agent_eval.agents import get_solver
+from multi_agent_eval.samples import get_sample
+from multi_agent_eval.scorer import multi_agent_scorer
 
-from agents import agent_collection_solver
-from multi_agent_eval.samples import unique_digits, webserver
-from scorer import multi_agent_scorer
+# TODO: `uv run inspect eval` does not lod run.py -> moving the log configuration there does not have an effect.
+# For now I will put it here as this module is always imported.
+_LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+logger.add(_LOG_DIR / "eval_{time}.log", level="DEBUG")
 
 
 @task
-def multi_agent_file_modification(max_messages: int = 100, temperature: float = 0.7) -> Task:
+def multi_agent_file_modification(
+    *,
+    sample: str = "unique_digits",
+    dataset: str | None = None,  # TODO: implement dataset support to distinguish between sample and dataset
+    solver: str = "debug",
+    max_messages: int = 100,
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+    sandbox: str = "docker",
+) -> Task:
     """
-    Create a multi-agent file modification evaluation task.
+    Default Inspect AI task used by the evaluation harness.
 
-    Args:
-        max_messages: Maximum messages per conversation
-        temperature: Temperature for generation
+    Callers can override the dataset or solver by specifying the corresponding registry keys.
     """
 
-    dataset = MemoryDataset([webserver.create_sample()])
+    dataset = get_sample(sample).as_dataset()
+    solver = get_solver(solver)
 
     return Task(
         dataset=dataset,
-        # solver=as_solver(forgetful_agent(), limits=[message_limit(max_messages)]),
-        solver=agent_collection_solver(),
+        solver=solver,
         scorer=multi_agent_scorer(),
-        config=GenerateConfig(temperature=temperature, max_tokens=2000),
-        sandbox="docker",
+        config=GenerateConfig(temperature=temperature, max_tokens=max_tokens),
+        sandbox=sandbox,
         message_limit=max_messages,
     )

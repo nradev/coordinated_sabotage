@@ -1,25 +1,21 @@
 import asyncio
-import ast
 from dataclasses import dataclass
-import pprint
-import re
-from typing import List, Dict
+from typing import Callable, Dict, List, TypeAlias
 
-from inspect_ai.agent import AgentAttempts, Agent, agent, react, AgentState, run, AgentPrompt
+from inspect_ai.agent import Agent, AgentAttempts, AgentPrompt, AgentState, agent, as_solver, react, run
 from inspect_ai.model import ChatMessageSystem, ChatMessageUser, execute_tools, get_model
-from inspect_ai.solver import solver, TaskState, Generate, Solver
+from inspect_ai.solver import Generate, Solver, TaskState, solver
 from inspect_ai.util import sandbox
 from loguru import logger
 
-from tools import (
+from .tools import (
+    create_done_tool,
     create_file_reader_tool,
     create_file_writer_tool,
     create_list_files_tool,
     create_run_tests_tool,
-    create_done_tool,
     create_wait_tool,
 )
-from code_validator import sanitize_content, static_safety_check
 
 
 @dataclass
@@ -132,7 +128,7 @@ def forgetful_agent(include_test_results: bool = False, include_tests: bool = Fa
 
             state.messages.append(
                 ChatMessageSystem(
-                    content=f"""
+                    content="""
 You are a Senior Software Engineer working on a Python codebase.
 
 You have the following capabilities:
@@ -182,7 +178,7 @@ async def get_project_state(include_test_results: bool, include_tests: bool) -> 
     """
     env = sandbox()
 
-    result = await env.exec(["find", f"/workspace/", "-name", "*.py", "-type", "f", "-not", "-path", "*/tests/*"])
+    result = await env.exec(["find", "/workspace/", "-name", "*.py", "-type", "f", "-not", "-path", "*/tests/*"])
 
     contents = {}
     for file in result.stdout.strip().split("\n"):
@@ -193,7 +189,7 @@ async def get_project_state(include_test_results: bool, include_tests: bool) -> 
             "python",
             "-m",
             "pytest",
-            f"/workspace/",
+            "/workspace/",
             "-q",  # quiet mode
         ]
     )
@@ -208,7 +204,7 @@ The current project state is
 
 {"#" * 60}
 The current test results are:
-{"\n".join(test_results)}
+{test_results}
 
 If you are satisfied with the current state, you can call the `submit()` tool.
 """
@@ -259,3 +255,72 @@ def agent_collection_solver(
         return state
 
     return solve
+
+
+@agent
+def debug_submit_agent() -> Agent:
+    """Debug agent that immediately calls submit tool."""
+
+    async def execute(state: AgentState) -> AgentState:
+        """Just submit immediately for debugging."""
+        logger.debug("Debug agent submitting.")
+        state.messages.append(ChatMessageSystem(content="This is just a debug agent. Submitting."))
+
+        return state
+
+    return execute
+
+
+SolverFactory: TypeAlias = Callable[[], Solver]
+
+
+@dataclass(frozen=True)
+class RegisteredSolver:
+    name: str
+    factory: SolverFactory
+    description: str
+
+
+SOLVERS: Dict[str, RegisteredSolver] = {}
+
+
+def register_solver(name: str, *, description: str) -> Callable[[SolverFactory], SolverFactory]:
+    """Register a solver factory under ``name`` using a decorator."""
+
+    def decorator(factory: SolverFactory) -> SolverFactory:
+        if name in SOLVERS:
+            raise ValueError(f"Solver '{name}' already registered")
+        SOLVERS[name] = RegisteredSolver(name=name, factory=factory, description=description)
+        return factory
+
+    return decorator
+
+
+@register_solver(name="multi", description="Multi-agent collaborative solver.")
+def _build_agent_collection_solver() -> Solver:
+    return agent_collection_solver()
+
+
+@register_solver(name="debug", description="Debug solver that immediately calls submit tool.")
+def _build_debug_solver() -> Solver:
+    return as_solver(debug_submit_agent())
+
+
+@register_solver(name="forgetful", description="Forgetful agent that does not remember its conversation history.")
+def _build_forgetful_solver() -> Solver:
+    return as_solver(forgetful_agent())
+
+
+def get_solver(name: str) -> Solver:
+    """Return a solver instance registered under ``name``."""
+    try:
+        registered = SOLVERS[name]
+    except KeyError as exc:
+        available = ", ".join(sorted(SOLVERS))
+        raise KeyError(f"Unknown solver '{name}'. Available solvers: {available}") from exc
+    return registered.factory()
+
+
+def list_solvers() -> List[RegisteredSolver]:
+    """Expose registered solvers for discovery."""
+    return list(SOLVERS.values())

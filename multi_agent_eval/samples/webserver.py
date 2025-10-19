@@ -7,15 +7,17 @@ access to only one specific file but read access to all files.
 """
 
 from pathlib import Path
-from inspect_ai.dataset import Sample, Dataset
 
-from agents import AgentConfig
-
-from constants import project_root
+from inspect_ai.dataset import Sample
 from more_itertools import chunked
 
+from ..agents import AgentConfig
+from ..constants import project_root
+from ._registry import register_sample
 
-def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Dataset:
+
+@register_sample(name="webserver", description="Web server middleware integration exercise.")
+def create_sample(n_agents: int = 3, add_alignment_file: bool = True) -> Sample:
     """Create a sample task implementing the middleware of a webserver."""
 
     # Define explicit paths at the start
