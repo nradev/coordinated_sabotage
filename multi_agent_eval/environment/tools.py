@@ -347,6 +347,283 @@ def create_wait_tool(agent_id: str) -> Tool:
     return wait()
 
 
+def create_grep_tool(agent_id: str, read_access: List[str] | None = None, working_dir: str | None = None) -> Tool:
+    """
+    Create a tool to search for patterns in files using grep.
+    If read_access is None, there are no restrictions.
+    """
+
+    @tool
+    def grep():
+        async def execute(pattern: str, file_path: str = ".", options: str = "") -> str:
+            """
+            Search for patterns in files using grep.
+
+            Args:
+                pattern: The pattern to search for (regex supported)
+                file_path: File or directory to search in (default: current directory)
+                options: Additional grep options as a string (e.g., "-r" for recursive, "-i" for case-insensitive,
+                        "-n" for line numbers, "-l" for filenames only). Multiple options can be combined (e.g., "-rn").
+
+            Returns:
+                Matching lines from the search
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError(f"[{agent_id}] Sandbox environment not available")
+
+                # Ensure the file path is within the repo
+                if file_path.startswith("/") or ".." in file_path:
+                    raise ToolError(f"[{agent_id}] Invalid file path. Use relative paths within the repo.")
+
+                # Check read permissions for this agent
+                # For recursive searches or directory searches, we can't check all files upfront,
+                # so we only check if a specific file is provided
+                if read_access is not None and file_path != ".":
+                    # Check if this is a specific file (not a directory or recursive search)
+                    is_recursive = "-r" in options or "-R" in options
+                    if not is_recursive and file_path not in read_access:
+                        raise ToolError(f"[{agent_id}] only has read access to {read_access}. Cannot grep {file_path}")
+
+                path = file_path
+                if working_dir is not None:
+                    if path == ".":
+                        path = working_dir
+                    else:
+                        path = f"{working_dir}/{path}"
+
+                # Build grep command
+                cmd = ["grep"]
+                if options:
+                    # Split options but be careful about option arguments
+                    cmd.extend(shlex.split(options))
+
+                # Add the pattern (use -- to separate options from pattern in case pattern starts with -)
+                cmd.append("--")
+                cmd.append(pattern)
+                cmd.append(path)
+
+                result = await sandbox_env.exec(cmd)
+
+                # grep returns 0 if matches found, 1 if no matches, 2+ for errors
+                if result.returncode > 1:
+                    raise ToolError(
+                        f"[{agent_id}] Error running grep:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+                    )
+
+                if result.returncode == 1:
+                    return f"[{agent_id}] No matches found for pattern '{pattern}' in {file_path}"
+
+                return f"[{agent_id}] Grep results for pattern '{pattern}' in {file_path}:\n{result.stdout}"
+
+            except ToolError:
+                raise
+            except Exception as e:
+                raise ToolError(f"[{agent_id}] Error running grep: {str(e)}")
+
+        return execute
+
+    return grep()
+
+
+def create_patch_tool(
+    agent_id: str,
+    write_access: List[str] | None = None,
+    validators: List[Callable] | None = None,
+    modifiers: List[Callable] | None = None,
+    working_dir: str | None = None,
+) -> Tool:
+    """
+    Create a tool to apply unified diff patches to files.
+    If write_access is None, there are no restrictions.
+    """
+
+    # TODO figure out why models can't seem to get the patch format right
+    @tool
+    def patch():
+        async def execute(patch_content: str, strip_level: int = 1) -> str:
+            """
+            Apply a unified diff patch to files. Use the standard 'diff -u' format.
+
+            Args:
+                patch_content: Unified diff format only. Must start with '--- a/' and '+++ b/' headers.
+                    Format requirements:
+                    1. File header: --- a/path/to/file.py
+                    2. File header: +++ b/path/to/file.py
+                    3. Hunk header: @@ -start,count +start,count @@
+                    4. Context lines MUST start with space ' '
+                    5. Removed lines start with '-'
+                    6. Added lines start with '+'
+
+                    Example (note the leading space on 'def foo():'):
+                    --- a/file.py
+                    +++ b/file.py
+                    @@ -1,3 +1,3 @@
+                     def foo():
+                    -    return 1
+                    +    return 2
+
+                    DO NOT use custom formats like '*** Begin Patch' or '*** Update File:'.
+                    DO NOT use bare '@@' without line numbers.
+
+                strip_level: Number of leading path components to strip (default: 1)
+
+            Returns:
+                Success message or error
+            """
+            try:
+                sandbox_env = sandbox()
+                if not sandbox_env:
+                    raise ToolError(f"[{agent_id}] Sandbox environment not available")
+
+                # Clean up patch content
+                patch_content = patch_content.strip()
+                lines = patch_content.split("\n")
+
+                # Check for and reject custom patch formats
+                first_line = lines[0] if lines else ""
+                if first_line.startswith("*** Begin Patch") or first_line.startswith("*** Update File"):
+                    raise ToolError(
+                        f"[{agent_id}] Invalid patch format detected.\n\n"
+                        f"You used a custom format starting with '{first_line[:30]}'.\n"
+                        f"This tool ONLY accepts standard unified diff format.\n\n"
+                        f"Required format:\n"
+                        f"--- a/path/to/file\n"
+                        f"+++ b/path/to/file\n"
+                        f"@@ -line,count +line,count @@\n"
+                        f" context line (note leading space)\n"
+                        f"-removed line\n"
+                        f"+added line\n"
+                    )
+
+                # Remove common trailing markers that models add
+                trailing_markers = [
+                    "*** End Patch",
+                    "*** END PATCH",
+                    "End Patch",
+                    "END PATCH",
+                    "```",
+                ]
+                for marker in trailing_markers:
+                    if patch_content.endswith(marker):
+                        patch_content = patch_content[: -len(marker)].rstrip()
+                        lines = patch_content.split("\n")  # Re-split after cleanup
+                errors = []
+
+                # Check for basic patch structure
+                has_old_file_header = any(line.startswith("---") for line in lines)
+                has_new_file_header = any(line.startswith("+++") for line in lines)
+                has_hunk_header = any(line.startswith("@@") and "@@" in line[2:] for line in lines)
+
+                if not has_old_file_header:
+                    errors.append("Missing '--- a/filename' header (old file marker)")
+                if not has_new_file_header:
+                    errors.append("Missing '+++ b/filename' header (new file marker)")
+                if not has_hunk_header:
+                    errors.append("Missing '@@ -line,count +line,count @@' hunk header")
+
+                # Validate hunk lines
+                in_hunk = False
+                for i, line in enumerate(lines, 1):
+                    if line.startswith("@@"):
+                        in_hunk = True
+                        # Validate hunk header format
+                        if not re.match(r"^@@\s+-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s+@@", line):
+                            errors.append(f"Line {i}: Invalid hunk header format: {line[:50]}")
+                    elif in_hunk and line and not line.startswith(("---", "+++")):
+                        # Every line in a hunk must start with space, +, -, or be a new file marker
+                        if not line[0] in (" ", "+", "-", "\\"):
+                            errors.append(
+                                f"Line {i}: Context line missing leading space. "
+                                f"Line starts with: {repr(line[0])} (full line: {line[:50]}...)"
+                            )
+
+                if errors:
+                    error_msg = "\n".join(errors)
+                    raise ToolError(
+                        f"[{agent_id}] Invalid patch format:\n{error_msg}\n\n"
+                        f"REMINDER: Context lines (unchanged code) MUST start with a space character."
+                    )
+
+                # Extract files that will be modified from the patch
+                # Match both "+++ b/path" and "+++ path" formats
+                modified_files_raw = re.findall(r"^\+\+\+ (.+?)(?:\s|$)", patch_content, re.MULTILINE)
+
+                # Strip the appropriate number of path components based on strip_level
+                modified_files = []
+                for file_path in modified_files_raw:
+                    # Remove trailing whitespace/timestamp if present
+                    file_path = file_path.split()[0] if file_path.split() else file_path
+
+                    # Apply strip level
+                    parts = file_path.split("/")
+                    if strip_level < len(parts):
+                        stripped_path = "/".join(parts[strip_level:])
+                        modified_files.append(stripped_path)
+                    elif strip_level == 0:
+                        modified_files.append(file_path)
+
+                # Check write permissions for all files that will be modified
+                if write_access is not None:
+                    for file_path in modified_files:
+                        if file_path not in write_access:
+                            raise ToolError(
+                                f"[{agent_id}] only has write access to {write_access}. Cannot patch {file_path}"
+                            )
+
+                # Run validators if provided
+                for validator in validators or []:
+                    for file_path in modified_files:
+                        await validator(patch_content, agent_id, file_path, sandbox_env, write_access)
+
+                # Run modifiers if provided
+                for modifier in modifiers or []:
+                    for file_path in modified_files:
+                        patch_content = await modifier(patch_content, agent_id, file_path, sandbox_env, write_access)
+
+                # Write patch to temporary file
+                patch_file_path = f"/tmp/{agent_id}_patch.diff"
+                await sandbox_env.write_file(patch_file_path, patch_content)
+
+                # Apply patch
+                path = "."
+                if working_dir is not None:
+                    path = working_dir
+
+                result = await sandbox_env.exec(
+                    ["bash", "-c", f"cd {path} && patch -p{strip_level} < {patch_file_path}"]
+                )
+
+                if result.returncode != 0:
+                    raise ToolError(
+                        f"[{agent_id}] Error applying patch:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+                    )
+
+                # Log the modification for each file
+                for file_path in modified_files:
+                    log_path = f"{SANDBOX_WORKSPACE}/.agent_logs/{agent_id}_modifications.log"
+                    log_entry = f"Patched {file_path} at step {asyncio.current_task().get_name()}\n"
+
+                    try:
+                        existing_log = await sandbox_env.read_file(log_path)
+                        await sandbox_env.write_file(log_path, existing_log + log_entry)
+                    except FileNotFoundError:
+                        await sandbox_env.write_file(log_path, log_entry)
+
+                files_msg = ", ".join(modified_files) if modified_files else "files"
+                return f"[{agent_id}] Successfully applied patch to: {files_msg}\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+
+            except ToolError:
+                raise
+            except Exception as e:
+                raise ToolError(f"[{agent_id}] Error applying patch: {str(e)}")
+
+        return execute
+
+    return patch()
+
+
 def create_done_tool(agent_id: str) -> AgentSubmit:
     """Create a tool to indicate that the agent is done with all file edits."""
 
@@ -424,6 +701,128 @@ async def summarize_tools(
                         tool_call.arguments["content"] = "[CONTENT_WAS_TRUNCATED_FOR_BREVITY]"
                     tool_calls.append(tool_call)
                 message = message.model_copy(update=dict(tool_calls=tool_calls))
+        filtered.append(message)
+
+    return filtered
+
+
+async def summarize_tools_per_file(
+    messages: list[ChatMessage],
+    keep_last_n: int = 1,
+) -> list[ChatMessage]:
+    """Summarize tool calls from messages, tracking reads per file.
+
+    Args:
+       messages: Messages to summarize tool calls from.
+       keep_last_n: The number of most recent tool call messages to keep per file.
+
+    Returns:
+       Messages with summarized tool calls.
+
+    """
+    from collections import defaultdict
+
+    # Track counts per file for read operations
+    read_counts_per_file: dict[str, int] = defaultdict(int)
+    write_counts_per_file: dict[str, int] = defaultdict(int)
+
+    # First pass: count operations per file
+    for message in messages:
+        if isinstance(message, ChatMessageTool):
+            if message.function == "read_file":
+                # Extract file_path from the message content
+                # Format is typically "[agent_id] Successfully read {file_path}:\n..."
+                try:
+                    first_line = message.content.split("\n")[0]
+                    if "Successfully read" in first_line:
+                        file_path = first_line.split("Successfully read ")[1].rstrip(":")
+                        read_counts_per_file[file_path] += 1
+                except (IndexError, AttributeError):
+                    pass
+            elif message.function == "write_file":
+                # Extract file_path from the message content
+                # Format is typically "[agent_id] Successfully wrote to {file_path}"
+                try:
+                    if "Successfully wrote to" in message.content:
+                        file_path = message.content.split("Successfully wrote to ")[1].strip()
+                        write_counts_per_file[file_path] += 1
+                except (IndexError, AttributeError):
+                    pass
+
+    # Track remaining counts to keep per file
+    remaining_reads_per_file = {fp: count for fp, count in read_counts_per_file.items()}
+    remaining_writes_per_file = {fp: count for fp, count in write_counts_per_file.items()}
+
+    n_run_tests = sum([m.function == "run_tests" for m in messages if isinstance(m, ChatMessageTool)])
+
+    # Track write_file calls in assistant messages
+    write_file_calls_per_file: dict[str, int] = defaultdict(int)
+    for message in messages:
+        if isinstance(message, ChatMessageAssistant) and message.tool_calls:
+            for tc in message.tool_calls:
+                if tc.function == "write_file":
+                    try:
+                        file_path = tc.arguments.get("file_path", "")
+                        if file_path:
+                            write_file_calls_per_file[file_path] += 1
+                    except (AttributeError, KeyError):
+                        pass
+
+    remaining_write_calls_per_file = {fp: count for fp, count in write_file_calls_per_file.items()}
+
+    filtered: list[ChatMessage] = []
+    for message in messages:
+        if isinstance(message, ChatMessageTool):
+            summarize = False
+
+            if message.function == "read_file":
+                try:
+                    first_line = message.content.split("\n")[0]
+                    if "Successfully read" in first_line:
+                        file_path = first_line.split("Successfully read ")[1].rstrip(":")
+                        if remaining_reads_per_file.get(file_path, 0) > keep_last_n:
+                            summarize = True
+                            remaining_reads_per_file[file_path] -= 1
+                except (IndexError, AttributeError):
+                    pass
+
+            elif message.function == "write_file":
+                try:
+                    if "Successfully wrote to" in message.content:
+                        file_path = message.content.split("Successfully wrote to ")[1].strip()
+                        if remaining_writes_per_file.get(file_path, 0) > keep_last_n:
+                            summarize = True
+                            remaining_writes_per_file[file_path] -= 1
+                except (IndexError, AttributeError):
+                    pass
+
+            elif message.function == "run_tests" and n_run_tests > keep_last_n:
+                summarize = True
+                n_run_tests -= 1
+
+            if summarize:
+                message = message.model_copy(
+                    update=dict(
+                        content=message.content.split("\n")[0] + "\n[CONTENT_WAS_TRUNCATED_FOR_BREVITY]",
+                        text=message.text.split("\n")[0] + "\n[CONTENT_WAS_TRUNCATED_FOR_BREVITY]",
+                    )
+                )
+
+        elif isinstance(message, ChatMessageAssistant):
+            if message.tool_calls:
+                tool_calls = []
+                for tool_call in message.tool_calls:
+                    if tool_call.function == "write_file":
+                        try:
+                            file_path = tool_call.arguments.get("file_path", "")
+                            if file_path and remaining_write_calls_per_file.get(file_path, 0) > keep_last_n:
+                                remaining_write_calls_per_file[file_path] -= 1
+                                tool_call.arguments["content"] = "[CONTENT_WAS_TRUNCATED_FOR_BREVITY]"
+                        except (AttributeError, KeyError):
+                            pass
+                    tool_calls.append(tool_call)
+                message = message.model_copy(update=dict(tool_calls=tool_calls))
+
         filtered.append(message)
 
     return filtered

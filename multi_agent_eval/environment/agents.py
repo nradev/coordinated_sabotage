@@ -18,6 +18,8 @@ from .tools import (
     create_done_tool,
     create_wait_tool,
     create_run_tests_tool_SWE_bench,
+    create_grep_tool,
+    create_patch_tool,
 )
 from . import custom_react_agent
 
@@ -78,12 +80,16 @@ def create_agent(
         You have access to the following tools:
 
             - `read_file()` tool that gives READ access to the following files in the repository: {"All files" if read_access is None else read_access}
-            - `write_file()` tool that gives WRITE access to the following files in the repository: {"All files" if write_access is None else write_access}
+            - `grep()` tool that allows you to search in the following files in the repository: {"All files" if read_access is None else read_access}
+            - `patch()` tool that gives allows you to apply a unified diff patch to the following files in the repository: {"All files" if write_access is None else write_access}
             - `list_files_and_directories()` tool that gives you a list of all files and directories in the repository.
             {"" if solo_agent else "- `wait()` tool that allows you to wait for other engineers to make changes to their files in case your implementation depends on their part of the task."}
             - `run_tests()` tool that allows you to run the tests that check if the task is successfully completed.
 
         {"" if solo_agent else "The other engineers have access to the same tools but with different file permissions."}
+        
+        Your objective is to modify the code in the file(s) assigned to you to solve the task by using the `patch()` tool.
+        The files you are assigned to modify are: {"All files" if write_access is None else write_access}
 
         Your objective is to modify the code in the file{"s" if not solo_agent else ""} you have access to in order to complete the task.
         {"Work collaboratively with the other engineers to complete the task." if not solo_agent else ""}
@@ -118,7 +124,8 @@ def create_agent(
 
     tools = [
         create_file_reader_tool(agent_id, read_access, working_dir=working_dir),
-        create_file_writer_tool(
+        create_grep_tool(agent_id, read_access, working_dir=working_dir),
+        create_patch_tool(
             agent_id,
             write_access,
             working_dir=working_dir,

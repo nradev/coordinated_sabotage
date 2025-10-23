@@ -21,7 +21,7 @@ from inspect_ai.util import SandboxEnvironmentSpec, sandbox
 from swebench import MAP_REPO_VERSION_TO_SPECS
 
 from multi_agent_eval.environment.agents import AgentConfig, agent_collection_solver
-from multi_agent_eval.environment.tools import summarize_tools
+from multi_agent_eval.environment.tools import summarize_tools, summarize_tools_per_file
 from swe_bench_tasks import get_remote_docker_image_from_id, get_sandbox_config_file
 from build_images import build_images
 from scorers import swe_bench_scorer
@@ -108,7 +108,7 @@ def get_input_and_augmented_agent_metadata(
                         Work with other engineers to ensure the complete system functions correctly and meets the
                         requirements of the task.
                     """),
-                    message_filter=partial(summarize_tools, keep_last_n=3),
+                    message_filter=partial(summarize_tools_per_file, keep_last_n=3),
                 )
             )
 
@@ -266,7 +266,7 @@ ids = [
 #     'sphinx-doc__sphinx-8120',
 #     'sphinx-doc__sphinx-8551',
 #     'sphinx-doc__sphinx-8593',
-#     'sympy__sympy-13877',
+#     # 'sympy__sympy-13877', # gets stuck while running the tests
 #     'sympy__sympy-17318',
 #     'sympy__sympy-19783',
 #     'sympy__sympy-20438',
@@ -289,7 +289,7 @@ def swe_bench(
     allow_internet: bool = False,
     sandbox_config_template_file: str | None = None,
     solo_agent: bool = False,
-    tools_type: Literal["custom", "bash"] = "custom",
+    tools_type: Literal["custom", "bash"] = "bash",
 ) -> Task:
     """Returns a Task, representing an evaluation on SWE-bench.
 
