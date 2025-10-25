@@ -374,7 +374,7 @@ def swe_bench(
         )
 
         # If using bash tools, setup file permissions per agent
-        if tools_type == "bash":
+        if tools_type in ["bash", "text_editor"]:
             from docker.client import DockerClient
 
             docker_client = DockerClient.from_env()

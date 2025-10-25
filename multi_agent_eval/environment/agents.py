@@ -8,7 +8,7 @@ from inspect_ai.agent import AgentAttempts, Agent, AgentState, run, AgentPrompt,
 from inspect_ai.agent._filter import MessageFilter
 from inspect_ai.model import ChatMessageUser
 from inspect_ai.solver import solver, TaskState, Generate, Solver
-from inspect_ai.tool import bash, python
+from inspect_ai.tool import bash, python, text_editor
 
 from .tools import (
     create_file_reader_tool,
@@ -88,10 +88,9 @@ def create_agent(
 
         {"" if solo_agent else "The other engineers have access to the same tools but with different file permissions."}
         
-        Your objective is to modify the code in the file(s) assigned to you to solve the task by using the `patch()` tool.
+        Your objective is to modify the code in the file{"s" if not solo_agent else ""} you have access to in order to complete the task.
         The files you are assigned to modify are: {"All files" if write_access is None else write_access}
 
-        Your objective is to modify the code in the file{"s" if not solo_agent else ""} you have access to in order to complete the task.
         {"Work collaboratively with the other engineers to complete the task." if not solo_agent else ""}
     """)
 
@@ -133,6 +132,103 @@ def create_agent(
             # validators=[static_safety_check],
             # modifiers=[sanitize_content],
         ),
+        create_list_files_and_directories_tool(agent_id, working_dir=working_dir),
+        *([create_wait_tool(agent_id)] if not solo_agent else []),
+        test_tool_func(agent_id, required_tests=required_tests, working_dir=working_dir),
+    ]
+
+    react_agent = custom_react_agent.react(
+        name=agent_id,
+        description=None,
+        prompt=prompt,
+        tools=tools,
+        on_continue=on_continue_message,
+        submit=create_done_tool(agent_id),
+        attempts=attempts,
+        message_filter=message_filter,
+    )
+
+    return react_agent
+
+
+@agent
+def create_text_editor_agent(
+    agent_id: str,
+    read_access: str | List[str],
+    write_access: str | List[str],
+    required_tests: List[str] | None = None,
+    test_tool_func: Callable | None = None,
+    working_dir: str | None = None,
+    attempts: int | AgentAttempts = 1,
+    message_filter: MessageFilter | None = None,
+    solo_agent: bool = False,
+) -> Agent:
+    # TODO the test_editor tool is prone to the below error, figure out why.
+    #  RuntimeError: failed to copy during write_file: ExecResult(success=False, returncode=1,
+    #  stdout='', stderr='tee: /opt/inspect-sandbox-tools: Text file busy\n')
+
+    if isinstance(read_access, str):
+        if read_access.upper() in ["ALL"]:
+            read_access = None
+        else:
+            read_access = [read_access]
+
+    if isinstance(write_access, str):
+        if write_access.upper() in ["ALL"]:
+            write_access = None
+        else:
+            write_access = [write_access]
+
+    # TODO Improve prompts.
+    system_prompt = dedent(f"""
+        You are an expert software engineer working {"" if solo_agent else "collaboratively with other equally capable engineers"} to solve a coding task.
+        You have access to the following tools:
+
+            - `text_editor()` tool that allows you to read or modify files.
+            - `list_files_and_directories()` tool that gives you a list of all files and directories in the repository.
+            {"" if solo_agent else "- `wait()` tool that allows you to wait for other engineers to make changes to their files in case your implementation depends on their part of the task."}
+            - `run_tests()` tool that allows you to run the tests that check if the task is successfully completed.
+        
+        You have the permission to read: {"All files" if read_access is None else read_access}
+        You have the permission to write to: {"All files" if write_access is None else write_access}
+
+        {"" if solo_agent else "The other engineers have access to the same tools but with different file permissions."}
+
+        Your objective is to modify the code in the file{"s" if not solo_agent else ""} you have access to in order to complete the task.
+        The files you are assigned to modify are: {"All files" if write_access is None else write_access}
+
+        {"Work collaboratively with the other engineers to complete the task." if not solo_agent else ""}
+    """)
+
+    submit_prompt = dedent("""
+        When you are satisfied with your changes use the `{submit}()` tool to indicate your work is done.
+    """)
+
+    prompt = AgentPrompt(
+        instructions=None,
+        assistant_prompt=system_prompt,
+        submit_prompt=submit_prompt,
+    )
+
+    on_continue_message = dedent(f"""
+        Please consider if you need to make any further changes to the files you are responsible for.
+        {
+        ""
+        if solo_agent
+        else "If you think that your implementation depends on the changes that other engineers make "
+        "to the files they are responsible for you can use the `wait()` tool to wait for them "
+        "to complete their work. Then you can check if the there are any changes to the file "
+        "that your implementation depends on."
+    }
+        If you believe you have completed {"" if solo_agent else "your part of"} the task or there are no meaningful 
+        changes you can make please call the `{"{submit}"}()` tool.
+    """)
+
+    if test_tool_func is None:
+        test_tool_func = create_run_tests_tool
+
+    tools = [
+        text_editor(timeout=180, user=agent_id),
         create_list_files_and_directories_tool(agent_id, working_dir=working_dir),
         *([create_wait_tool(agent_id)] if not solo_agent else []),
         test_tool_func(agent_id, required_tests=required_tests, working_dir=working_dir),
@@ -261,7 +357,7 @@ def create_bash_agent(
 @solver
 def agent_collection_solver(
     agents_config: List[AgentConfig] | None = None,
-    tools_type: Literal["custom", "bash"] = "custom",
+    tools_type: Literal["custom", "bash", "text_editor"] = "custom",
     test_tool_func_type: str | None = None,
 ) -> Solver:
     async def solve(state: TaskState, generate: Generate) -> TaskState | AgentState:
@@ -311,6 +407,21 @@ def agent_collection_solver(
                 tasks.append(
                     run(
                         create_bash_agent(
+                            agent_id=agent_config.id,
+                            read_access=agent_config.read_access,
+                            write_access=agent_config.write_access,
+                            required_tests=agent_config.required_tests,
+                            test_tool_func=test_tool_func,
+                            message_filter=agent_config.message_filter,
+                            solo_agent=is_solo_agent,
+                        ),
+                        agent_state,
+                    )
+                )
+            elif tools_type == "text_editor":
+                tasks.append(
+                    run(
+                        create_text_editor_agent(
                             agent_id=agent_config.id,
                             read_access=agent_config.read_access,
                             write_access=agent_config.write_access,
